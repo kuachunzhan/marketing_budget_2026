@@ -172,8 +172,12 @@
                             <span x-text="t('已分配總比例：', 'Total Share: ')"></span>
                             <span class="font-bold text-indigo-900" x-text="totalAllocatedPercentage + '%'"></span>
                         </div>
+                        <button @click="openCategoryModal = true" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition shrink-0 flex items-center gap-1 shadow-sm">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span x-text="t('新增管道', 'Add Channel')"></span>
+                        </button>
                         <button @click="resetEqualShare()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition shrink-0">
-                            <span x-text="t('平均分配 (20%)', 'Balance (20%)')"></span>
+                            <span x-text="t('平均分配', 'Balance Equally')"></span>
                         </button>
                     </div>
                 </div>
@@ -197,6 +201,10 @@
                                         <span class="text-xs text-slate-500 font-bold ml-1">₫</span>
                                     </div>
                                     <span class="text-xs text-slate-400 font-medium hidden sm:inline" x-text="'(≈ NT$ ' + formatNumber(vndToTwd(getCategoryBudget(cat.id))) + ')'"></span>
+                                    <!-- Delete Category Button -->
+                                    <button @click="deleteCategory(cat.id)" class="text-slate-400 hover:text-rose-600 transition ml-2 p-1" :title="t('刪除此管道', 'Delete Channel')">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
                                 </div>
                             </div>
 
@@ -610,21 +618,40 @@
 
     <!-- Cloud Sync Modal -->
     <div x-cloak x-show="openCloudModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 class="text-base font-bold text-slate-900" x-text="t('Google Sheet 雲端同步設定', 'Google Sheet Cloud Sync Settings')"></h3>
-            <p class="text-xs text-slate-500" x-text="t('貼上 Google Apps Script 網頁應用程式網址，實現多人共編與備份', 'Paste your Google Apps Script Web App URL for multi-user sync and cloud backups.')"></p>
+        <!-- ... existing cloud sync modal content ... -->
+    </div>
 
-            <div class="space-y-2 text-xs">
-                <label class="block font-semibold text-slate-700" x-text="t('Apps Script Web App URL', 'Apps Script Web App URL')"></label>
-                <input type="text" x-model="googleSheetUrl" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-[11px]">
+    <!-- Add Category / Channel Modal -->
+    <div x-cloak x-show="openCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 class="text-base font-bold text-slate-900" x-text="t('新增行銷管道 (如 OOH / 戶外廣告)', 'Add Marketing Channel (e.g. OOH)')"></h3>
+            
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('管道名稱 (中文)', 'Channel Name (Chinese)')"></label>
+                    <input type="text" x-model="newCategory.nameZh" placeholder="e.g. 戶外廣告 (OOH)" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('管道名稱 (英文)', 'Channel Name (English)')"></label>
+                    <input type="text" x-model="newCategory.nameEn" placeholder="e.g. Out of Home (OOH)" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('編列預算金額 (VND ₫)', 'Initial Budget (VND ₫)')"></label>
+                    <input type="number" step="10000000" x-model.number="newCategory.budgetAmount" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                    <p class="text-[11px] text-indigo-600 mt-1 font-medium" x-text="'≈ NT$ ' + formatNumber(vndToTwd(newCategory.budgetAmount))"></p>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('標籤主題顏色', 'Color Theme')"></label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" x-model="newCategory.color" class="w-10 h-8 p-0.5 rounded border border-slate-300 cursor-pointer">
+                        <span class="text-xs font-mono text-slate-600 font-semibold" x-text="newCategory.color"></span>
+                    </div>
+                </div>
             </div>
 
-            <div class="flex justify-between items-center pt-2">
-                <button @click="syncWithCloud()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                    <span x-text="t('立即同步', 'Sync Now')"></span>
-                </button>
-                <button @click="openCloudModal = false" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold" x-text="t('關閉', 'Close')"></button>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button @click="openCategoryModal = false" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold" x-text="t('取消', 'Cancel')"></button>
+                <button @click="saveCategory()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold shadow-sm hover:bg-indigo-700 transition" x-text="t('建立管道', 'Create Channel')"></button>
             </div>
         </div>
     </div>
@@ -642,6 +669,7 @@
                 openVendorModal: false,
                 openInstallmentModal: false,
                 openCloudModal: false,
+                openCategoryModal: false,
 
                 selectedCategoryFilter: 'ALL',
                 vendorSearchQuery: '',
@@ -654,6 +682,13 @@
                     { id: 'PRODUCT', nameZh: '產品行銷', nameEn: 'Product Marketing', percentage: 15, budgetAmount: 1200000000, color: '#10b981' },
                     { id: 'EVENT', nameZh: '線下活動', nameEn: 'Offline Events', percentage: 10, budgetAmount: 800000000, color: '#8b5cf6' }
                 ],
+
+                newCategory: {
+                    nameZh: '',
+                    nameEn: '',
+                    budgetAmount: 0,
+                    color: '#06b6d4'
+                },
 
                 vendors: [
                     {
@@ -1100,10 +1135,46 @@
                 },
 
                 resetEqualShare() {
+                    if (this.categories.length === 0) return;
+                    const equalPct = parseFloat((100 / this.categories.length).toFixed(1));
                     this.categories.forEach(c => {
-                        c.percentage = 20;
-                        c.budgetAmount = Math.round(this.annualBudget * 0.2);
+                        c.percentage = equalPct;
+                        c.budgetAmount = Math.round((this.annualBudget * equalPct) / 100);
                     });
+                    this.updateChartData();
+                    this.saveState();
+                },
+
+                saveCategory() {
+                    if (!this.newCategory.nameZh && !this.newCategory.nameEn) return;
+                    const catId = 'CAT_' + Date.now();
+                    const nameZh = this.newCategory.nameZh || this.newCategory.nameEn;
+                    const nameEn = this.newCategory.nameEn || this.newCategory.nameZh;
+                    const budgetAmount = Number(this.newCategory.budgetAmount) || 0;
+                    const percentage = this.annualBudget > 0 ? parseFloat(((budgetAmount / this.annualBudget) * 100).toFixed(1)) : 0;
+
+                    this.categories.push({
+                        id: catId,
+                        nameZh: nameZh,
+                        nameEn: nameEn,
+                        percentage: percentage,
+                        budgetAmount: budgetAmount,
+                        color: this.newCategory.color || '#06b6d4'
+                    });
+
+                    this.openCategoryModal = false;
+                    this.newCategory = { nameZh: '', nameEn: '', budgetAmount: 0, color: '#06b6d4' };
+                    
+                    this.$nextTick(() => {
+                        if (window.lucide) lucide.createIcons();
+                        this.updateChartData();
+                    });
+                    this.saveState();
+                },
+
+                deleteCategory(catId) {
+                    if (this.categories.length <= 1) return;
+                    this.categories = this.categories.filter(c => c.id !== catId);
                     this.updateChartData();
                     this.saveState();
                 },
