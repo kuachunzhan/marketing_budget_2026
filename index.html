@@ -1,945 +1,603 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marketing Budget & Vendor Management Dashboard</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        [x-cloak] { display: none !important; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marketing Budget & Vendor Management 2026</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased min-h-screen" x-data="budgetApp()" x-init="initApp()">
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen" x-data="budgetApp()" x-init="initApp()" x-cloak>
 
-    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-3">
-            <div class="flex items-center space-x-3">
-                <div class="bg-indigo-600 p-2 rounded-lg text-white">
-                    <i data-lucide="wallet" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold tracking-tight" x-text="t('行銷預算與廠商管理系統', 'Marketing Budget & Vendor System')"></h1>
-                    <p class="text-xs text-slate-400" x-text="t('多管道預算調配 | 廠商三期撥款 | 合約到期追蹤', 'Multi-channel Allocation | 3-Stage Installments | Contract Expiry Track')"></p>
-                </div>
-            </div>
-
-            <div class="flex items-center space-x-3">
-                <!-- Sync Status Badge -->
-                <button @click="openCloudModal = true" class="flex items-center space-x-2 text-xs px-3 py-1.5 rounded-full border border-slate-700 hover:border-slate-500 transition">
-                    <span class="w-2 h-2 rounded-full" :class="{
-                        'bg-emerald-400 animate-pulse': syncStatus === 'synced',
-                        'bg-amber-400 animate-spin': syncStatus === 'syncing',
-                        'bg-slate-500': syncStatus === 'offline'
-                    }"></span>
-                    <span class="font-medium" x-text="syncStatusText"></span>
-                </button>
-
-                <!-- Language Toggle -->
-                <button @click="toggleLanguage()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-semibold text-slate-200 transition flex items-center gap-1.5">
-                    <i data-lucide="globe" class="w-3.5 h-3.5"></i>
-                    <span x-text="lang === 'zh' ? 'English' : '繁體中文'"></span>
-                </button>
-            </div>
+  <!-- 頂部導航列 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-600 text-white p-2 rounded-lg">
+          <i class="fa-solid fa-chart-pie text-lg"></i>
         </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
-        <!-- Expiry Alert Notification Banner -->
-        <template x-if="expiringVendors.length > 0">
-            <div class="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div class="flex items-start gap-3">
-                    <div class="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
-                        <i data-lucide="bell-ring" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-sm font-bold text-amber-900" x-text="t('合約即將到期預警（3 個月內）', 'Contract Expiry Warning (Within 90 Days)')"></h4>
-                        <p class="text-xs text-amber-700 mt-0.5">
-                            <span x-text="t('共有 ', 'There are ')"></span>
-                            <span class="font-bold underline" x-text="expiringVendors.length"></span>
-                            <span x-text="t(' 家合作廠商合約需評估續約或備置：', ' vendor contract(s) requiring renewal evaluation: ')"></span>
-                            <span class="font-semibold" x-text="expiringVendors.map(v => v.name + ' (' + v.daysLeft + t('天)', 'd)')).join(', ')"></span>
-                        </p>
-                    </div>
-                </div>
-                <button @click="currentTab = 'vendors'" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-sm transition shrink-0">
-                    <span x-text="t('查看廠商列表', 'View Vendors')"></span>
-                </button>
-            </div>
-        </template>
-
-        <!-- Navigation Tabs -->
-        <div class="flex border-b border-slate-200 mb-6 gap-2">
-            <button @click="switchTab('dashboard')" :class="currentTab === 'dashboard' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3 px-4 text-sm border-b-2 font-medium transition flex items-center gap-2">
-                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-                <span x-text="t('預算總覽與調配', 'Budget Overview & Reallocation')"></span>
-            </button>
-            <button @click="switchTab('expenses')" :class="currentTab === 'expenses' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3 px-4 text-sm border-b-2 font-medium transition flex items-center gap-2">
-                <i data-lucide="receipt" class="w-4 h-4"></i>
-                <span x-text="t('支出明細紀錄', 'Expense Transactions')"></span>
-            </button>
-            <button @click="switchTab('vendors')" :class="currentTab === 'vendors' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'" class="py-3 px-4 text-sm border-b-2 font-medium transition flex items-center gap-2">
-                <i data-lucide="building-2" class="w-4 h-4"></i>
-                <span x-text="t('廠商管理與撥款', 'Vendor Payment Management')"></span>
-            </button>
+        <div>
+          <h1 class="font-bold text-lg text-slate-900 leading-tight" x-text="lang === 'zh' ? '2026 行銷預算與廠商管理系統' : '2026 Marketing Budget & Vendor Hub'"></h1>
+          <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '預算分配 • 支出追蹤 • 廠商三期排程' : 'Budget Allocation • Spend Tracker • Vendor Installments'"></p>
         </div>
+      </div>
 
-        <div x-show="currentTab === 'dashboard'" class="space-y-6">
-            <!-- Metrics Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
-                    <div class="text-xs text-slate-500 font-medium" x-text="t('年度總預算 (VND / NT$)', 'Annual Budget (VND / NT$)')"></div>
-                    <div class="text-xl font-bold text-slate-900 mt-1" x-text="formatNumber(annualBudget) + ' ₫'"></div>
-                    <div class="text-xs text-indigo-600 mt-1 font-medium" x-text="'≈ NT$ ' + formatNumber(vndToTwd(annualBudget))"></div>
-                    <div class="mt-3 flex items-center text-xs gap-1 text-slate-500">
-                        <span x-text="t('預算調整：', 'Edit Total: ')"></span>
-                        <input type="number" step="100000000" x-model.number="annualBudget" @input="recalculateAllocations()" class="w-28 px-1.5 py-0.5 border border-slate-300 rounded text-xs">
-                    </div>
-                </div>
+      <!-- 狀態與工具列 -->
+      <div class="flex items-center space-x-2 sm:space-x-4">
+        <!-- 雲端同步狀態標籤 -->
+        <button @click="showSyncModal = true" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+          :class="{
+            'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100': syncStatus === 'synced',
+            'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100': syncStatus === 'syncing',
+            'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200': syncStatus === 'offline'
+          }">
+          <span class="w-2 h-2 rounded-full"
+            :class="{
+              'bg-emerald-500 animate-pulse': syncStatus === 'synced',
+              'bg-amber-500 animate-spin': syncStatus === 'syncing',
+              'bg-slate-400': syncStatus === 'offline'
+            }"></span>
+          <span x-text="getSyncStatusLabel()"></span>
+        </button>
 
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div class="text-xs text-slate-500 font-medium" x-text="t('目前已分配預算', 'Allocated Budget')"></div>
-                    <div class="text-xl font-bold text-indigo-600 mt-1" x-text="formatNumber(totalAllocatedAmount) + ' ₫'"></div>
-                    <div class="text-xs text-indigo-500 mt-1 font-medium" x-text="'≈ NT$ ' + formatNumber(vndToTwd(totalAllocatedAmount))"></div>
-                    <div class="mt-3 text-xs text-slate-500">
-                        <span x-text="t('分配比例：', 'Ratio: ')"></span>
-                        <span class="font-bold text-slate-800" x-text="totalAllocatedPercentage + '%'"></span>
-                    </div>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div class="text-xs text-slate-500 font-medium" x-text="t('實際已支出總額', 'Actual Total Spent')"></div>
-                    <div class="text-xl font-bold text-rose-600 mt-1" x-text="formatNumber(totalSpent) + ' ₫'"></div>
-                    <div class="text-xs text-rose-500 mt-1 font-medium" x-text="'≈ NT$ ' + formatNumber(vndToTwd(totalSpent))"></div>
-                    <div class="mt-3 text-xs text-slate-500">
-                        <span x-text="t('執行進度：', 'Execution: ')"></span>
-                        <span class="font-bold text-slate-800" x-text="overallExecutionRate + '%'"></span>
-                    </div>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div class="text-xs text-slate-500 font-medium" x-text="t('剩餘可預算金額', 'Remaining Budget')"></div>
-                    <div class="text-xl font-bold text-emerald-600 mt-1" x-text="formatNumber(remainingBudget) + ' ₫'"></div>
-                    <div class="text-xs text-emerald-500 mt-1 font-medium" x-text="'≈ NT$ ' + formatNumber(vndToTwd(remainingBudget))"></div>
-                    <div class="mt-3 text-xs text-slate-500">
-                        <span x-text="t('狀態：', 'Status: ')"></span>
-                        <span class="font-semibold" :class="remainingBudget >= 0 ? 'text-emerald-600' : 'text-rose-600'" x-text="remainingBudget >= 0 ? t('預算充足', 'Healthy') : t('已超出總預算', 'Over Budget')"></span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Visual Charts Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 class="text-sm font-bold text-slate-800 mb-4" x-text="t('各管道預算分配比例 (Pie Chart)', 'Budget Allocation Share')"></h3>
-                    <div class="h-64">
-                        <canvas id="allocationPieChart"></canvas>
-                    </div>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 class="text-sm font-bold text-slate-800 mb-4" x-text="t('編列預算 vs 實際支出 (Bar Chart)', 'Budget vs Actual Spend')"></h3>
-                    <div class="h-64">
-                        <canvas id="comparisonBarChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sliders for Reallocation -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 class="text-base font-bold text-slate-800" x-text="t('動態預算比例調配 (Reallocation)', 'Dynamic Budget Allocation')"></h3>
-                        <p class="text-xs text-slate-500 mt-0.5" x-text="t('拖曳滑桿即時調配五大行銷管道預算，系統自動算得金額', 'Drag sliders to redistribute budget across 5 channels in real-time')"></p>
-                    </div>
-                    <button @click="resetEqualShare()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">
-                        <span x-text="t('平均分配 (20%)', 'Balance (20%)')"></span>
-                    </button>
-                </div>
-
-                <div class="space-y-5">
-                    <template x-for="cat in categories" :key="cat.id">
-                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
-                            <div class="flex justify-between items-center text-sm">
-                                <div class="flex items-center space-x-2">
-                                    <span class="w-3 h-3 rounded-full" :style="'background-color:' + cat.color"></span>
-                                    <span class="font-bold text-slate-800" x-text="t(cat.nameZh, cat.nameEn)"></span>
-                                </div>
-                                <div class="text-right">
-                                    <span class="font-bold text-indigo-700 text-base" x-text="formatNumber(getCategoryBudget(cat.id)) + ' ₫'"></span>
-                                    <span class="text-xs text-slate-400 ml-1" x-text="'(≈ NT$ ' + formatNumber(vndToTwd(getCategoryBudget(cat.id))) + ')'"></span>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center gap-4">
-                                <input type="range" min="0" max="100" step="1" x-model.number="cat.percentage" @input="updateChartData(); saveState();" class="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg cursor-pointer">
-                                <span class="w-12 text-right font-bold text-slate-700 text-sm" x-text="cat.percentage + '%'"></span>
-                            </div>
-
-                            <!-- Progress Indicator -->
-                            <div class="flex justify-between items-center text-xs pt-1">
-                                <div class="text-slate-500">
-                                    <span x-text="t('已實支：', 'Spent: ')"></span>
-                                    <span class="font-semibold text-slate-700" x-text="formatNumber(getCategorySpent(cat.id)) + ' ₫'"></span>
-                                </div>
-                                <div>
-                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold" :class="getCategoryStatusClass(cat.id)" x-text="getCategoryStatusText(cat.id)"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </div>
-
-        <div x-show="currentTab === 'expenses'" class="space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <div>
-                        <h3 class="text-base font-bold text-slate-800" x-text="t('行銷支出明細紀錄', 'Expense Transactions Log')"></h3>
-                        <p class="text-xs text-slate-500 mt-0.5" x-text="t('所有實際發生的行銷費用與各廠商核銷狀況', 'Log and track all marketing spend and payment statuses')"></p>
-                    </div>
-
-                    <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <select x-model="selectedCategoryFilter" class="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-700">
-                            <option value="ALL" x-text="t('所有管道類別', 'All Categories')"></option>
-                            <template x-for="c in categories" :key="c.id">
-                                <option :value="c.id" x-text="t(c.nameZh, c.nameEn)"></option>
-                            </template>
-                        </select>
-
-                        <button @click="openExpenseModal = true" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5 shrink-0">
-                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                            <span x-text="t('新增支出紀錄', 'Add Expense')"></span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-slate-600">
-                        <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
-                            <tr>
-                                <th class="p-3" x-text="t('日期', 'Date')"></th>
-                                <th class="p-3" x-text="t('項目名稱', 'Item / Title')"></th>
-                                <th class="p-3" x-text="t('管道類別', 'Category')"></th>
-                                <th class="p-3" x-text="t('合作廠商 (連動)', 'Vendor')"></th>
-                                <th class="p-3 text-right" x-text="t('金額 (VND / NT$)', 'Amount')"></th>
-                                <th class="p-3" x-text="t('撥款狀態', 'Payment')"></th>
-                                <th class="p-3 text-center" x-text="t('操作', 'Action')"></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <template x-for="item in filteredExpenses" :key="item.id">
-                                <tr class="hover:bg-slate-50/80 transition">
-                                    <td class="p-3 text-slate-500 whitespace-nowrap" x-text="item.date"></td>
-                                    <td class="p-3 font-semibold text-slate-800" x-text="item.title"></td>
-                                    <td class="p-3">
-                                        <span class="px-2 py-0.5 rounded text-[11px] font-medium" :style="'background-color:' + getCategoryColor(item.categoryId) + '20; color:' + getCategoryColor(item.categoryId)" x-text="getCategoryName(item.categoryId)"></span>
-                                    </td>
-                                    <td class="p-3">
-                                        <template x-if="item.vendorId">
-                                            <button @click="jumpToVendor(item.vendorId)" class="text-indigo-600 hover:underline font-medium" x-text="getVendorName(item.vendorId)"></button>
-                                        </template>
-                                        <template x-if="!item.vendorId">
-                                            <span class="text-slate-400" x-text="t('無指定廠商', 'Direct Spend')"></span>
-                                        </template>
-                                    </td>
-                                    <td class="p-3 text-right font-bold text-slate-800">
-                                        <div x-text="formatNumber(item.amount) + ' ₫'"></div>
-                                        <div class="text-[10px] text-slate-400 font-normal" x-text="'≈ NT$ ' + formatNumber(vndToTwd(item.amount))"></div>
-                                    </td>
-                                    <td class="p-3">
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold" :class="item.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="item.paymentStatus === 'PAID' ? t('已結清', 'Paid') : t('待核銷', 'Pending')"></span>
-                                    </td>
-                                    <td class="p-3 text-center">
-                                        <button @click="deleteExpense(item.id)" class="text-slate-400 hover:text-rose-600 transition">
-                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div x-show="currentTab === 'vendors'" class="space-y-6">
-            <!-- Vendor Summary Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div class="text-xs text-slate-500 font-medium" x-text="t('合作廠商總數', 'Total Vendors')"></div>
-                    <div class="text-2xl font-bold text-slate-900 mt-1" x-text="vendors.length"></div>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div class="text-xs text-slate-500 font-medium" x-text="t('已撥付廠商總額', 'Vendor Total Paid')"></div>
-                    <div class="text-xl font-bold text-emerald-600 mt-1" x-text="formatNumber(vendorPaidTotal) + ' ₫'"></div>
-                    <div class="text-xs text-emerald-500 mt-1" x-text="'≈ NT$ ' + formatNumber(vndToTwd(vendorPaidTotal))"></div>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div class="text-xs text-slate-500 font-medium" x-text="t('待付合約尾款/尾款', 'Vendor Pending Total')"></div>
-                    <div class="text-xl font-bold text-amber-600 mt-1" x-text="formatNumber(vendorPendingTotal) + ' ₫'"></div>
-                    <div class="text-xs text-amber-500 mt-1" x-text="'≈ NT$ ' + formatNumber(vndToTwd(vendorPendingTotal))"></div>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <div>
-                        <h3 class="text-base font-bold text-slate-800" x-text="t('廠商付款與合約管理', 'Vendor Payment & Contracts')"></h3>
-                        <p class="text-xs text-slate-500 mt-0.5" x-text="t('支援三期彈性付款、到期金額追蹤與 90 天合約到期提醒', 'Flexible 3-stage payment schedules & 90-day contract expiration warnings')"></p>
-                    </div>
-
-                    <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <input type="text" x-model="vendorSearchQuery" :placeholder="t('搜尋廠商名稱/聯絡人...', 'Search vendor...')" class="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-700 w-full sm:w-48">
-                        <button @click="openVendorModal = true" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition flex items-center gap-1.5 shrink-0">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                            <span x-text="t('新增廠商', 'Add Vendor')"></span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <template x-for="v in filteredVendors" :key="v.id">
-                        <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 hover:border-indigo-300 transition space-y-4">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <h4 class="font-bold text-slate-900 text-base" x-text="v.name"></h4>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getContractBadgeClass(v.contractEndDate)" x-text="getContractBadgeText(v.contractEndDate)"></span>
-                                    </div>
-                                    <p class="text-xs text-slate-500 mt-1">
-                                        <span x-text="t('主要服務：', 'Category: ')"></span>
-                                        <span class="font-medium text-slate-700" x-text="getCategoryName(v.categoryId)"></span>
-                                    </p>
-                                </div>
-                                <span class="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold" x-text="v.paymentTerms"></span>
-                            </div>
-
-                            <!-- Contract dates -->
-                            <div class="text-xs text-slate-500 bg-white p-2.5 rounded-lg border border-slate-100 flex justify-between">
-                                <div>
-                                    <span class="text-slate-400" x-text="t('合約起迄：', 'Contract Term: ')"></span>
-                                    <span class="font-medium text-slate-700" x-text="(v.contractStartDate || 'N/A') + ' ~ ' + (v.contractEndDate || 'N/A')"></span>
-                                </div>
-                            </div>
-
-                            <!-- Installments Summary -->
-                            <template x-if="v.isInstallment">
-                                <div class="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/80 space-y-2">
-                                    <div class="flex justify-between items-center text-xs font-bold text-indigo-900">
-                                        <span x-text="t('三期撥款排程進度', '3-Stage Payment Schedule')"></span>
-                                        <button @click="openInstallmentConfig(v)" class="text-indigo-600 hover:underline text-[11px]" x-text="t('調整排程/核銷', 'Adjust / Settle')"></button>
-                                    </div>
-                                    <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                                        <div class="p-2 bg-white rounded-lg border border-slate-100">
-                                            <div class="text-[10px] text-slate-400" x-text="t('1期 (頭款)', 'Stage 1')"></div>
-                                            <div class="font-bold text-slate-800" x-text="formatCompactNumber(v.installments[0].amount)"></div>
-                                            <span class="px-1.5 py-0.2 text-[9px] rounded font-bold" :class="v.installments[0].status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="v.installments[0].status === 'PAID' ? t('已付', 'Paid') : t('待付', 'Due')"></span>
-                                        </div>
-                                        <div class="p-2 bg-white rounded-lg border border-slate-100">
-                                            <div class="text-[10px] text-slate-400" x-text="t('2期 (期中款)', 'Stage 2')"></div>
-                                            <div class="font-bold text-slate-800" x-text="formatCompactNumber(v.installments[1].amount)"></div>
-                                            <span class="px-1.5 py-0.2 text-[9px] rounded font-bold" :class="v.installments[1].status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="v.installments[1].status === 'PAID' ? t('已付', 'Paid') : t('待付', 'Due')"></span>
-                                        </div>
-                                        <div class="p-2 bg-white rounded-lg border border-slate-100">
-                                            <div class="text-[10px] text-slate-400" x-text="t('3期 (尾款)', 'Stage 3')"></div>
-                                            <div class="font-bold text-slate-800" x-text="formatCompactNumber(v.installments[2].amount)"></div>
-                                            <span class="px-1.5 py-0.2 text-[9px] rounded font-bold" :class="v.installments[2].status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="v.installments[2].status === 'PAID' ? t('已付', 'Paid') : t('待付', 'Due')"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-
-                            <template x-if="!v.isInstallment">
-                                <div class="flex justify-between items-center text-xs bg-white p-3 rounded-xl border border-slate-100">
-                                    <div>
-                                        <span class="text-slate-400" x-text="t('單期結清金額：', 'Single Payment: ')"></span>
-                                        <span class="font-bold text-slate-800" x-text="formatNumber(v.contractAmount) + ' ₫'"></span>
-                                    </div>
-                                    <button @click="openInstallmentConfig(v)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold" x-text="t('轉為三期付款', 'Switch to 3-Stage')"></button>
-                                </div>
-                            </template>
-
-                            <div class="flex justify-between items-center text-xs text-slate-400 pt-1">
-                                <span><i data-lucide="mail" class="w-3.5 h-3.5 inline mr-1"></i><span x-text="v.email || 'N/A'"></span></span>
-                                <button @click="deleteVendor(v.id)" class="text-rose-500 hover:underline" x-text="t('刪除廠商', 'Delete')"></button>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Add Expense Modal -->
-    <div x-cloak x-show="openExpenseModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 class="text-base font-bold text-slate-900" x-text="t('新增行銷支出紀錄', 'New Expense Record')"></h3>
-            
-            <div class="space-y-3 text-xs">
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('項目標題', 'Title')"></label>
-                    <input type="text" x-model="newExpense.title" placeholder="e.g. Q3 Meta Ads" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('行銷管道類別', 'Category')"></label>
-                    <select x-model="newExpense.categoryId" class="w-full px-3 py-2 border rounded-lg bg-white">
-                        <template x-for="c in categories" :key="c.id">
-                            <option :value="c.id" x-text="t(c.nameZh, c.nameEn)"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('合作廠商 (選填)', 'Vendor (Optional)')"></label>
-                    <select x-model="newExpense.vendorId" class="w-full px-3 py-2 border rounded-lg bg-white">
-                        <option value="" x-text="t('無特定廠商 / 直接支出', 'None / Direct Spend')"></option>
-                        <template x-for="v in vendors" :key="v.id">
-                            <option :value="v.id" x-text="v.name"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('金額 (VND ₫)', 'Amount (VND ₫)')"></label>
-                    <input type="number" step="1000000" x-model.number="newExpense.amount" class="w-full px-3 py-2 border rounded-lg">
-                    <p class="text-[11px] text-indigo-600 mt-1 font-medium" x-text="'≈ NT$ ' + formatNumber(vndToTwd(newExpense.amount))"></p>
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('發生日期', 'Date')"></label>
-                    <input type="date" x-model="newExpense.date" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-            </div>
-
-            <div class="flex justify-end space-x-2 pt-2">
-                <button @click="openExpenseModal = false" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold" x-text="t('取消', 'Cancel')"></button>
-                <button @click="saveExpense()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold shadow-sm" x-text="t('儲存項目', 'Save')"></button>
-            </div>
-        </div>
+        <!-- 中英文切換按鈕 -->
+        <button @click="toggleLanguage()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition">
+          <i class="fa-solid fa-globe mr-1"></i> <span x-text="lang === 'zh' ? 'EN' : '繁中'"></span>
+        </button>
+      </div>
     </div>
 
-    <!-- Add Vendor Modal -->
-    <div x-cloak x-show="openVendorModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 class="text-base font-bold text-slate-900" x-text="t('新增合作廠商', 'Add Vendor')"></h3>
-            
-            <div class="space-y-3 text-xs">
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('廠商名稱', 'Vendor Name')"></label>
-                    <input type="text" x-model="newVendor.name" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('提供服務類別', 'Service Category')"></label>
-                    <select x-model="newVendor.categoryId" class="w-full px-3 py-2 border rounded-lg bg-white">
-                        <template x-for="c in categories" :key="c.id">
-                            <option :value="c.id" x-text="t(c.nameZh, c.nameEn)"></option>
-                        </template>
-                    </select>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block font-semibold text-slate-700 mb-1" x-text="t('合約開始日', 'Contract Start')"></label>
-                        <input type="date" x-model="newVendor.contractStartDate" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-700 mb-1" x-text="t('合約到期日', 'Contract End')"></label>
-                        <input type="date" x-model="newVendor.contractEndDate" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('合約總金額 (VND ₫)', 'Contract Total (VND ₫)')"></label>
-                    <input type="number" step="10000000" x-model.number="newVendor.contractAmount" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-            </div>
+    <!-- 分頁選單 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 border-t border-slate-100 text-sm">
+      <button @click="currentTab = 'overview'" class="py-3 font-medium border-b-2 transition" :class="currentTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
+        <i class="fa-solid fa-chart-line mr-1.5"></i><span x-text="lang === 'zh' ? '預算總覽與分配' : 'Budget Overview & Sliders'"></span>
+      </button>
+      <button @click="currentTab = 'expenses'" class="py-3 font-medium border-b-2 transition" :class="currentTab === 'expenses' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
+        <i class="fa-solid fa-receipt mr-1.5"></i><span x-text="lang === 'zh' ? '支出明細記錄' : 'Expenses Log'"></span>
+      </button>
+      <button @click="currentTab = 'vendors'" class="py-3 font-medium border-b-2 transition" :class="currentTab === 'vendors' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
+        <i class="fa-solid fa-building-user mr-1.5"></i><span x-text="lang === 'zh' ? '廠商付款與合約管理' : 'Vendor & Contract Hub'"></span>
+      </button>
+    </div>
+  </header>
 
-            <div class="flex justify-end space-x-2 pt-2">
-                <button @click="openVendorModal = false" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold" x-text="t('取消', 'Cancel')"></button>
-                <button @click="saveVendor()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold shadow-sm" x-text="t('建立廠商', 'Create')"></button>
-            </div>
+  <!-- 主內容區 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- 頂部核心總覽指標 (KPI Cards) -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider" x-text="lang === 'zh' ? '年度總預算' : 'Annual Total Budget'"></div>
+        <div class="text-2xl font-bold text-slate-900 mt-2" x-text="formatVND(totalBudget)"></div>
+        <div class="text-xs text-indigo-600 font-medium mt-1" x-text="`≈ ${formatNTD(totalBudget)}`"></div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider" x-text="lang === 'zh' ? '已執行總支出' : 'Total Spent'"></div>
+        <div class="text-2xl font-bold text-emerald-600 mt-2" x-text="formatVND(totalSpent())"></div>
+        <div class="text-xs text-slate-500 font-medium mt-1" x-text="`≈ ${formatNTD(totalSpent())}`"></div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider" x-text="lang === 'zh' ? '剩餘可用預算' : 'Remaining Budget'"></div>
+        <div class="text-2xl font-bold mt-2" :class="remainingBudget() < 0 ? 'text-rose-600' : 'text-slate-900'" x-text="formatVND(remainingBudget())"></div>
+        <div class="text-xs text-slate-500 font-medium mt-1" x-text="`≈ ${formatNTD(remainingBudget())}`"></div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider" x-text="lang === 'zh' ? '整體執行率' : 'Overall Execution Rate'"></div>
+        <div class="text-2xl font-bold text-indigo-600 mt-2" x-text="overallExecutionRate() + '%'"></div>
+        <div class="w-full bg-slate-100 rounded-full h-2 mt-2">
+          <div class="bg-indigo-600 h-2 rounded-full transition-all duration-300" :style="`width: ${Math.min(overallExecutionRate(), 100)}%`"></div>
         </div>
+      </div>
     </div>
 
-    <!-- 3-Stage Installments Modal -->
-    <div x-cloak x-show="openInstallmentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4" x-data="{ currentVendor: activeVendorForInstallment }">
-            <div class="flex justify-between items-center">
-                <h3 class="text-base font-bold text-slate-900" x-text="t('三期撥款排程與核銷設定', '3-Stage Payment Schedule')"></h3>
-                <button @click="openInstallmentModal = false" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+    <!-- TAB 1: 預算總覽與分配 -->
+    <div x-show="currentTab === 'overview'" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 左側：五大分類動態分配滑桿 -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <h2 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '行銷管道預算動態調配' : 'Dynamic Marketing Budget Allocation'"></h2>
+              <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '拖曳滑桿即時分配五大類別年度預算比例' : 'Drag sliders to rebalance allocation weights in real-time'"></p>
             </div>
+            <button @click="rebalanceEqually()" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition">
+              <i class="fa-solid fa-arrows-split-up-and-left mr-1"></i> <span x-text="lang === 'zh' ? '均分 20%' : 'Balance 20%'"></span>
+            </button>
+          </div>
 
-            <template x-if="activeVendorForInstallment">
-                <div class="space-y-4 text-xs">
-                    <div class="p-3 bg-slate-50 rounded-xl flex justify-between items-center">
-                        <div>
-                            <div class="font-bold text-slate-800" x-text="activeVendorForInstallment.name"></div>
-                            <div class="text-slate-500" x-text="t('合約總金額：', 'Total: ') + formatNumber(activeVendorForInstallment.contractAmount) + ' ₫'"></div>
-                        </div>
-                        <button @click="toggleInstallmentMode(activeVendorForInstallment)" class="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded font-bold">
-                            <span x-text="activeVendorForInstallment.isInstallment ? t('切換為單期結清', 'Switch to Single') : t('切換為三期分期', 'Switch to 3-Stage')"></span>
-                        </button>
-                    </div>
-
-                    <template x-if="activeVendorForInstallment.isInstallment">
-                        <div class="space-y-3">
-                            <template x-for="(inst, idx) in activeVendorForInstallment.installments" :key="idx">
-                                <div class="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
-                                    <div class="flex justify-between items-center font-bold text-slate-700">
-                                        <span x-text="t(['第一期 (頭款)', '第二期 (期中款)', '第三期 (尾款)'][idx], ['Stage 1 (Upfront)', 'Stage 2 (Mid)', 'Stage 3 (Final)'][idx])"></span>
-                                        <button @click="inst.status = inst.status === 'PAID' ? 'PENDING' : 'PAID'; saveState();" class="px-2 py-0.5 rounded text-[10px] font-bold" :class="inst.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="inst.status === 'PAID' ? t('已結清 (標記未付)', 'Paid (Mark Due)') : t('待核銷 (標記已付)', 'Pending (Mark Paid)')"></button>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label class="text-[10px] text-slate-400" x-text="t('撥款金額 (VND)', 'Amount (VND)')"></label>
-                                            <input type="number" step="1000000" x-model.number="inst.amount" @input="saveState()" class="w-full px-2 py-1 border rounded">
-                                        </div>
-                                        <div>
-                                            <label class="text-[10px] text-slate-400" x-text="t('預計到期日', 'Due Date')"></label>
-                                            <input type="date" x-model="inst.dueDate" @change="saveState()" class="w-full px-2 py-1 border rounded">
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
+          <div class="space-y-5">
+            <template x-for="(cat, index) in categories" :key="cat.id">
+              <div class="space-y-2 p-3 rounded-lg border border-slate-100 hover:border-indigo-100 transition bg-slate-50/50">
+                <div class="flex justify-between items-center text-sm">
+                  <span class="font-semibold text-slate-800" x-text="lang === 'zh' ? cat.name_zh : cat.name_en"></span>
+                  <div class="text-right">
+                    <span class="font-bold text-slate-900" x-text="formatVND(getCatAllocatedAmount(cat))"></span>
+                    <span class="text-xs text-slate-400 ml-1" x-text="`(${cat.percent}%)`"></span>
+                    <div class="text-[11px] text-slate-500" x-text="`≈ ${formatNTD(getCatAllocatedAmount(cat))}`"></div>
+                  </div>
                 </div>
+                <input type="range" min="0" max="100" step="1" x-model.number="cat.percent" @input="onSliderChange(index)" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                <div class="flex justify-between items-center text-xs text-slate-500 pt-1">
+                  <span><span x-text="lang === 'zh' ? '已支：' : 'Spent: '"></span><strong class="text-slate-700" x-text="formatVND(getCatSpent(cat.id))"></strong></span>
+                  <span :class="getCatSpent(cat.id) > getCatAllocatedAmount(cat) ? 'text-rose-600 font-bold' : 'text-emerald-600'" x-text="`${lang === 'zh' ? '進度：' : 'Progress: '}${getCatProgress(cat)}%`"></span>
+                </div>
+              </div>
             </template>
-
-            <div class="flex justify-end pt-2">
-                <button @click="openInstallmentModal = false" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold" x-text="t('完成並關閉', 'Done')"></button>
-            </div>
+          </div>
         </div>
+
+        <!-- 右側：圓餅圖視覺化 -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+          <h3 class="font-bold text-slate-900 text-sm mb-4 self-start" x-text="lang === 'zh' ? '預算分配佔比 (Pie Chart)' : 'Allocation Distribution'"></h3>
+          <div class="w-full max-w-[280px]">
+            <canvas id="budgetPieChart"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Cloud Sync Modal -->
-    <div x-cloak x-show="openCloudModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 class="text-base font-bold text-slate-900" x-text="t('Google Sheet 雲端同步設定', 'Google Sheet Cloud Sync Settings')"></h3>
-            <p class="text-xs text-slate-500" x-text="t('貼上 Google Apps Script 網頁應用程式網址，實現多人共編與備份', 'Paste your Google Apps Script Web App URL for multi-user sync and cloud backups.')"></p>
-
-            <div class="space-y-2 text-xs">
-                <label class="block font-semibold text-slate-700" x-text="t('Apps Script Web App URL', 'Apps Script Web App URL')"></label>
-                <input type="text" x-model="googleSheetUrl" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 border rounded-lg font-mono text-[11px]">
-            </div>
-
-            <div class="flex justify-between items-center pt-2">
-                <button @click="syncWithCloud()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                    <span x-text="t('立即同步', 'Sync Now')"></span>
-                </button>
-                <button @click="openCloudModal = false" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold" x-text="t('關閉', 'Close')"></button>
-            </div>
+    <!-- TAB 2: 支出明細記錄 -->
+    <div x-show="currentTab === 'expenses'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '行銷支出清單' : 'Expense Transactions'"></h2>
+          <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '點擊廠商名稱可直接跳轉至廠商付款管理' : 'Click vendor name to jump directly to vendor payment hub'"></p>
         </div>
+        <button @click="openNewExpenseModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+          <i class="fa-solid fa-plus mr-1"></i> <span x-text="lang === 'zh' ? '新增支出' : 'Add Expense'"></span>
+        </button>
+      </div>
+
+      <div class="overflow-x-auto border border-slate-100 rounded-lg">
+        <table class="w-full text-left text-xs text-slate-600">
+          <thead class="bg-slate-50 text-slate-700 uppercase font-semibold border-b border-slate-200">
+            <tr>
+              <th class="px-4 py-3" x-text="lang === 'zh' ? '專案 / 項目名稱' : 'Project / Title'"></th>
+              <th class="px-4 py-3" x-text="lang === 'zh' ? '行銷類別' : 'Category'"></th>
+              <th class="px-4 py-3" x-text="lang === 'zh' ? '合作廠商' : 'Vendor'"></th>
+              <th class="px-4 py-3" x-text="lang === 'zh' ? '金額 (VND / NTD)' : 'Amount'"></th>
+              <th class="px-4 py-3" x-text="lang === 'zh' ? '支出日期' : 'Date'"></th>
+              <th class="px-4 py-3 text-right" x-text="lang === 'zh' ? '操作' : 'Action'"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <template x-for="exp in expenses" :key="exp.id">
+              <tr class="hover:bg-slate-50/80 transition">
+                <td class="px-4 py-3 font-medium text-slate-900" x-text="exp.title"></td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium text-[11px]" x-text="getCatName(exp.category)"></span></td>
+                <td class="px-4 py-3">
+                  <button @click="jumpToVendor(exp.vendor)" class="text-indigo-600 hover:underline font-medium" x-text="exp.vendor || '-'"></button>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="font-bold text-slate-800" x-text="formatVND(exp.amount)"></div>
+                  <div class="text-[10px] text-slate-400" x-text="`≈ ${formatNTD(exp.amount)}`"></div>
+                </td>
+                <td class="px-4 py-3 text-slate-500" x-text="exp.date"></td>
+                <td class="px-4 py-3 text-right">
+                  <button @click="deleteExpense(exp.id)" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <script>
-        function budgetApp() {
-            return {
-                lang: 'zh',
-                currentTab: 'dashboard',
-                annualBudget: 8000000000, // Default VND
-                twdExchangeRate: 800, // 1 TWD = 800 VND
+    <!-- TAB 3: 廠商付款與合約管理 -->
+    <div x-show="currentTab === 'vendors'" class="space-y-6">
+      <!-- 合約即將到期提醒橫幅 (90天內) -->
+      <template x-if="getExpiringVendors().length > 0">
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start space-x-3 text-amber-800 text-xs">
+          <i class="fa-solid fa-triangle-exclamation text-base text-amber-600 mt-0.5"></i>
+          <div>
+            <div class="font-bold mb-1" x-text="lang === 'zh' ? '合約到期預警提示 (90 天內到期)' : 'Contract Expiry Alerts (< 90 Days)'"></div>
+            <div class="space-x-2">
+              <template x-for="v in getExpiringVendors()" :key="v.id">
+                <span class="inline-block bg-amber-100 px-2 py-0.5 rounded font-medium text-[11px] mb-1">
+                  <strong x-text="v.name"></strong>: <span x-text="lang === 'zh' ? `尚餘 ${v.daysLeft} 天到期 (${v.endDate})` : `${v.daysLeft} days left (${v.endDate})`"></span>
+                </span>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
 
-                openExpenseModal: false,
-                openVendorModal: false,
-                openInstallmentModal: false,
-                openCloudModal: false,
+      <!-- 廠商列表與三期排程 -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '合作廠商名冊與三期付款進度' : 'Vendor Directory & Installment Tracker'"></h2>
+            <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '管理各廠商合約期程、付款條件與分期款項' : 'Manage contract terms, payment milestones and due dates'"></p>
+          </div>
+          <button @click="openNewVendorModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+            <i class="fa-solid fa-plus mr-1"></i> <span x-text="lang === 'zh' ? '新增廠商' : 'Add Vendor'"></span>
+          </button>
+        </div>
 
-                googleSheetUrl: 'https://script.google.com/macros/s/AKfycbwKZbvYp86RUWfEp2oC-_BAhO6z2iElYsH9ui3eoHi1jIHA0fxQ5T-3RCnqkyeYUIRtjg/exec',
-                syncStatus: 'offline', // 'offline', 'syncing', 'synced'
-                lastSyncedTime: '',
-                syncTimer: null,
+        <div class="overflow-x-auto border border-slate-100 rounded-lg">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-50 text-slate-700 uppercase font-semibold border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3" x-text="lang === 'zh' ? '廠商名稱' : 'Vendor'"></th>
+                <th class="px-4 py-3" x-text="lang === 'zh' ? '合約期間' : 'Contract Period'"></th>
+                <th class="px-4 py-3" x-text="lang === 'zh' ? '合約總額' : 'Contract Total'"></th>
+                <th class="px-4 py-3" x-text="lang === 'zh' ? '付款條件' : 'Terms'"></th>
+                <th class="px-4 py-3" x-text="lang === 'zh' ? '撥款進度 / 三期狀態' : 'Installments / Status'"></th>
+                <th class="px-4 py-3 text-right" x-text="lang === 'zh' ? '操作' : 'Action'"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <template x-for="v in vendors" :key="v.id">
+                <tr class="hover:bg-slate-50/80 transition">
+                  <td class="px-4 py-3 font-semibold text-slate-900" x-text="v.name"></td>
+                  <td class="px-4 py-3">
+                    <div x-text="`${v.startDate} ~ ${v.endDate}`"></div>
+                    <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                      :class="getContractBadge(v).class" x-text="getContractBadge(v).text"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="font-bold text-slate-800" x-text="formatVND(v.totalContract)"></div>
+                    <div class="text-[10px] text-slate-400" x-text="`≈ ${formatNTD(v.totalContract)}`"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[11px]" x-text="v.paymentType === '3_stage' ? (lang === 'zh' ? '三期分期' : '3-Stage') : (lang === 'zh' ? '單期付清' : 'Full / Net')"></span>
+                  </td>
+                  <!-- 分期撥款狀態標籤 -->
+                  <td class="px-4 py-3">
+                    <template x-if="v.paymentType === '3_stage'">
+                      <div class="flex items-center space-x-1">
+                        <template x-for="(inst, i) in v.installments" :key="i">
+                          <button @click="toggleInstallmentStatus(v, i)" class="px-2 py-0.5 rounded text-[10px] font-medium border transition"
+                            :class="inst.paid ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-amber-50 text-amber-700 border-amber-300'"
+                            :title="`${inst.name}: ${formatVND(inst.amount)}`">
+                            <span x-text="`P${i+1}: `"></span>
+                            <span x-text="inst.paid ? (lang === 'zh' ? '已付' : 'Paid') : (lang === 'zh' ? '待付' : 'Due')"></span>
+                          </button>
+                        </template>
+                      </div>
+                    </template>
+                    <template x-if="v.paymentType !== '3_stage'">
+                      <button @click="toggleSingleStatus(v)" class="px-2.5 py-1 rounded text-[11px] font-semibold transition"
+                        :class="v.singlePaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'"
+                        x-text="v.singlePaid ? (lang === 'zh' ? '全額已付清' : 'Fully Paid') : (lang === 'zh' ? '尚未撥款' : 'Pending')">
+                      </button>
+                    </template>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <button @click="editVendor(v)" class="text-indigo-600 hover:text-indigo-800 p-1 mr-1"><i class="fa-regular fa-pen-to-square"></i></button>
+                    <button @click="deleteVendor(v.id)" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
 
-                selectedCategoryFilter: 'ALL',
-                vendorSearchQuery: '',
-                activeVendorForInstallment: null,
+  <!-- 雲端同步設定彈窗 -->
+  <div x-show="showSyncModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+        <h3 class="font-bold text-slate-900 text-base flex items-center">
+          <i class="fa-solid fa-cloud text-indigo-600 mr-2"></i> <span x-text="lang === 'zh' ? 'Google Sheets 雲端連線同步' : 'Google Sheets Cloud Sync'"></span>
+        </h3>
+        <button @click="showSyncModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
 
-                categories: [
-                    { id: 'SOCIAL', nameZh: '社群媒體', nameEn: 'Social Media', percentage: 25, color: '#6366f1' },
-                    { id: 'PR', nameZh: '公關活動', nameEn: 'Public Relations', percentage: 15, color: '#ec4899' },
-                    { id: 'ADS', nameZh: '成效廣告', nameEn: 'Performance Ads', percentage: 35, color: '#f59e0b' },
-                    { id: 'PRODUCT', nameZh: '產品行銷', nameEn: 'Product Marketing', percentage: 10, color: '#10b981' },
-                    { id: 'EVENTS', nameZh: '線下活動', nameEn: 'Offline Events', percentage: 15, color: '#8b5cf6' }
-                ],
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Google Apps Script Web App URL</label>
+          <input type="text" x-model="syncUrl" class="w-full px-3 py-2 border rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <p class="text-slate-500 leading-relaxed" x-text="lang === 'zh' ? '系統支援多人即時協作與自動定時同步，所有變更將自動同步至 Google 試算表。' : 'Supports multi-user real-time syncing and automatic cloud updates directly to Google Sheets.'"></p>
+      </div>
 
-                expenses: [
-                    { id: 'EXP-1', title: 'Q1 Meta & Google Ads Spend', categoryId: 'ADS', vendorId: 'V-1', amount: 1200000000, date: '2026-02-10', paymentStatus: 'PAID' },
-                    { id: 'EXP-2', title: 'KOL Influencer Sponsorship', categoryId: 'SOCIAL', vendorId: 'V-2', amount: 600000000, date: '2026-02-15', paymentStatus: 'PENDING' }
-                ],
+      <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+        <button @click="forceSyncFromCloud()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-xs transition">
+          <i class="fa-solid fa-arrows-rotate mr-1"></i> <span x-text="lang === 'zh' ? '立即測試同步' : 'Sync Now'"></span>
+        </button>
+        <button @click="showSyncModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
+          <span x-text="lang === 'zh' ? '完成' : 'Close'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
 
-                vendors: [
-                    {
-                        id: 'V-1',
-                        name: 'Adbright Digital Ads Agency',
-                        categoryId: 'ADS',
-                        contactName: 'Alex Lee',
-                        email: 'contact@adbright.com',
-                        paymentTerms: 'Net 30',
-                        contractAmount: 2000000000,
-                        contractStartDate: '2026-01-01',
-                        contractEndDate: '2026-09-30',
-                        isInstallment: false,
-                        installments: [
-                            { stage: 1, amount: 2000000000, dueDate: '2026-01-15', status: 'PAID' },
-                            { stage: 2, amount: 0, dueDate: '', status: 'PAID' },
-                            { stage: 3, amount: 0, dueDate: '', status: 'PAID' }
-                        ]
-                    },
-                    {
-                        id: 'V-2',
-                        name: 'Nova PR & Events Agency',
-                        categoryId: 'EVENTS',
-                        contactName: 'Sarah Chen',
-                        email: 'sarah@novapr.com',
-                        paymentTerms: '3-Stage',
-                        contractAmount: 1500000000,
-                        contractStartDate: '2026-02-01',
-                        contractEndDate: '2026-11-15',
-                        isInstallment: true,
-                        installments: [
-                            { stage: 1, amount: 500000000, dueDate: '2026-02-10', status: 'PAID' },
-                            { stage: 2, amount: 600000000, dueDate: '2026-05-20', status: 'PENDING' },
-                            { stage: 3, amount: 400000000, dueDate: '2026-08-30', status: 'PENDING' }
-                        ]
-                    }
-                ],
+  <!-- JavaScript 核心狀態與連線邏輯 -->
+  <script>
+    function budgetApp() {
+      return {
+        lang: 'zh',
+        currentTab: 'overview',
+        showSyncModal: false,
+        syncStatus: 'offline', // 'synced' | 'syncing' | 'offline'
+        syncUrl: 'https://script.google.com/macros/s/AKfycbwKZbvYp86RUWfEp2oC-_BAhO6z2iElYsH9ui3eoHi1jIHA0fxQ5T-3RCnqkyeYUIRtjg/exec',
+        totalBudget: 8000000000, // 80 億 VND (≈ 10,000,000 NT$)
+        rate: 800, // 1 NT$ ≈ 800 VND
 
-                newExpense: { title: '', categoryId: 'ADS', vendorId: '', amount: 0, date: new Date().toISOString().split('T')[0], paymentStatus: 'PENDING' },
-                newVendor: { name: '', categoryId: 'ADS', contactName: '', email: '', paymentTerms: '3-Stage', contractAmount: 0, contractStartDate: '', contractEndDate: '' },
+        categories: [
+          { id: 'social', name_zh: '社群媒體 (Social)', name_en: 'Social Media', percent: 25 },
+          { id: 'pr', name_zh: '公關傳播 (PR)', name_en: 'Public Relations', percent: 20 },
+          { id: 'performance', name_zh: '成效廣告 (Ads)', name_en: 'Performance Ads', percent: 25 },
+          { id: 'product', name_zh: '產品行銷 (Product)', name_en: 'Product Marketing', percent: 15 },
+          { id: 'offline', name_zh: '線下活動 (Events)', name_en: 'Offline Events', percent: 15 }
+        ],
 
-                allocationChart: null,
-                comparisonChart: null,
+        expenses: [
+          { id: 1, title: 'KOL 社群推廣專案', category: 'social', vendor: 'Media Star Agency', amount: 320000000, date: '2026-03-15' },
+          { id: 2, title: 'Q1 搜尋與成效廣告費', category: 'performance', vendor: 'Google Ads Ltd', amount: 480000000, date: '2026-03-20' },
+          { id: 3, title: 'Hilton  Saigon 實體論壇活動', category: 'offline', vendor: 'Vietnam Event Pro', amount: 640000000, date: '2026-04-10' }
+        ],
 
-                t(zh, en) { return this.lang === 'zh' ? zh : en; },
-                toggleLanguage() { this.lang = this.lang === 'zh' ? 'en' : 'zh'; this.saveState(); },
+        vendors: [
+          {
+            id: 1,
+            name: 'Vietnam Event Pro',
+            startDate: '2026-01-01',
+            endDate: '2026-06-30',
+            totalContract: 1200000000,
+            paymentType: '3_stage',
+            installments: [
+              { name: '訂金 30%', amount: 360000000, paid: true },
+              { name: '期中款 40%', amount: 480000000, paid: true },
+              { name: '尾款 30%', amount: 360000000, paid: false }
+            ]
+          },
+          {
+            id: 2,
+            name: 'Media Star Agency',
+            startDate: '2026-02-01',
+            endDate: '2026-09-30',
+            totalContract: 800000000,
+            paymentType: '3_stage',
+            installments: [
+              { name: '第一期 50%', amount: 400000000, paid: true },
+              { name: '第二期 30%', amount: 240000000, paid: false },
+              { name: '第三期 20%', amount: 160000000, paid: false }
+            ]
+          },
+          {
+            id: 3,
+            name: 'Google Ads Ltd',
+            startDate: '2026-01-01',
+            endDate: '2026-12-31',
+            totalContract: 2000000000,
+            paymentType: 'single',
+            singlePaid: true
+          }
+        ],
 
-                async initApp() {
-                    const savedSheetUrl = localStorage.getItem('mkt_app_sheet_url');
-                    if (savedSheetUrl) {
-                        this.googleSheetUrl = savedSheetUrl;
-                    }
+        chartInstance: null,
 
-                    const saved = localStorage.getItem('mkt_app_state');
-                    if (saved) {
-                        try {
-                            const parsed = JSON.parse(saved);
-                            this.annualBudget = parsed.annualBudget || this.annualBudget;
-                            this.categories = parsed.categories || this.categories;
-                            this.expenses = parsed.expenses || this.expenses;
-                            this.vendors = parsed.vendors || this.vendors;
-                            this.lang = parsed.lang || this.lang;
-                        } catch (e) {
-                            console.error("Local state parsing error:", e);
-                        }
-                    }
+        initApp() {
+          // 嘗試從 LocalStorage 載入歷史資料
+          const localState = localStorage.getItem('mkt_budget_state_2026');
+          if (localState) {
+            try {
+              const parsed = JSON.parse(localState);
+              if (parsed.totalBudget) this.totalBudget = parsed.totalBudget;
+              if (parsed.categories) this.categories = parsed.categories;
+              if (parsed.expenses) this.expenses = parsed.expenses;
+              if (parsed.vendors) this.vendors = parsed.vendors;
+            } catch(e) {}
+          }
 
-                    this.$nextTick(() => {
-                        if (window.lucide) lucide.createIcons();
-                        this.initCharts();
-                        this.startAutoSync();
-                    });
-                },
+          this.$nextTick(() => {
+            this.initChart();
+            // 自動啟動雲端同步
+            this.forceSyncFromCloud();
+            // 每 15 秒背景輪詢最新資料
+            setInterval(() => {
+              if (this.syncUrl) this.fetchCloudData(true);
+            }, 15000);
+          });
+        },
 
-                saveState() {
-                    const state = {
-                        annualBudget: this.annualBudget,
-                        categories: this.categories,
-                        expenses: this.expenses,
-                        vendors: this.vendors,
-                        lang: this.lang
-                    };
-                    localStorage.setItem('mkt_app_state', JSON.stringify(state));
-                    if (this.googleSheetUrl) {
-                        localStorage.setItem('mkt_app_sheet_url', this.googleSheetUrl);
-                    }
-                },
+        // 雲端連線與同步方法
+        getSyncStatusLabel() {
+          if (this.syncStatus === 'synced') return this.lang === 'zh' ? '雲端已同步' : 'Live Synced';
+          if (this.syncStatus === 'syncing') return this.lang === 'zh' ? '同步中...' : 'Syncing...';
+          return this.lang === 'zh' ? '單機模式' : 'Standalone';
+        },
 
-                startAutoSync() {
-                    if (this.googleSheetUrl) {
-                        this.syncWithCloud();
-                        this.syncTimer = setInterval(() => {
-                            this.syncWithCloud();
-                        }, 15000);
-                    }
-                },
+        // 使用 JSONP 機制讀取 Google Sheet 雲端資料 (100% 避開 CORS 阻擋)
+        fetchCloudData(silent = false) {
+          if (!this.syncUrl) return;
+          if (!silent) this.syncStatus = 'syncing';
 
-                async syncWithCloud() {
-                    if (!this.googleSheetUrl) return;
-                    this.syncStatus = 'syncing';
-                    try {
-                        const payload = {
-                            annualBudget: this.annualBudget,
-                            categories: this.categories,
-                            expenses: this.expenses,
-                            vendors: this.vendors
-                        };
-                        await fetch(this.googleSheetUrl, {
-                            method: 'POST',
-                            mode: 'no-cors',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        this.syncStatus = 'synced';
-                        this.lastSyncedTime = new Date().toLocaleTimeString();
-                    } catch (err) {
-                        console.error('Cloud Sync Error:', err);
-                        this.syncStatus = 'offline';
-                    }
-                },
+          const callbackName = 'gas_callback_' + Math.round(100000 * Math.random());
+          window[callbackName] = (response) => {
+            if (response && response.status === 'success' && response.data) {
+              const d = response.data;
+              if (d.totalBudget) this.totalBudget = d.totalBudget;
+              if (d.categories) this.categories = d.categories;
+              if (d.expenses) this.expenses = d.expenses;
+              if (d.vendors) this.vendors = d.vendors;
+              this.syncStatus = 'synced';
+              this.updateChart();
+            }
+            delete window[callbackName];
+            const scriptEl = document.getElementById(callbackName);
+            if (scriptEl) scriptEl.remove();
+          };
 
-                // Getters & Math
-                vndToTwd(vnd) { return Math.round(vnd / this.twdExchangeRate); },
-                formatNumber(val) { return (val || 0).toLocaleString(); },
-                formatCompactNumber(val) {
-                    if (!val) return '0 ₫';
-                    if (val >= 1000000000) return (val / 1000000000).toFixed(1) + 'B ₫';
-                    if (val >= 1000000) return (val / 1000000).toFixed(0) + 'M ₫';
-                    return val.toLocaleString() + ' ₫';
-                },
+          const script = document.createElement('script');
+          script.id = callbackName;
+          const separator = this.syncUrl.includes('?') ? '&' : '?';
+          script.src = `${this.syncUrl}${separator}callback=${callbackName}&action=get_data&t=${Date.now()}`;
+          script.onerror = () => {
+            this.syncStatus = 'offline';
+            delete window[callbackName];
+          };
+          document.body.appendChild(script);
+        },
 
-                get totalAllocatedAmount() {
-                    return this.categories.reduce((sum, c) => sum + (this.annualBudget * (c.percentage / 100)), 0);
-                },
-                get totalAllocatedPercentage() {
-                    return this.categories.reduce((sum, c) => sum + c.percentage, 0);
-                },
-                get totalSpent() {
-                    return this.expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-                },
-                get remainingBudget() {
-                    return this.annualBudget - this.totalSpent;
-                },
-                get overallExecutionRate() {
-                    return this.annualBudget ? Math.round((this.totalSpent / this.annualBudget) * 100) : 0;
-                },
-                get syncStatusText() {
-                    if (this.syncStatus === 'synced') return this.t('🟢 雲端已同步', 'Live Synced');
-                    if (this.syncStatus === 'syncing') return this.t('🟡 資料同步中...', 'Syncing...');
-                    return this.t('⚪ 離線模式', 'Offline');
-                },
+        // 推播最新資料至 Google Sheet
+        pushDataToCloud() {
+          // 先儲存至 LocalStorage
+          const payload = {
+            totalBudget: this.totalBudget,
+            categories: this.categories,
+            expenses: this.expenses,
+            vendors: this.vendors,
+            timestamp: new Date().toISOString()
+          };
+          localStorage.setItem('mkt_budget_state_2026', JSON.stringify(payload));
 
-                get filteredExpenses() {
-                    if (this.selectedCategoryFilter === 'ALL') return this.expenses;
-                    return this.expenses.filter(e => e.categoryId === this.selectedCategoryFilter);
-                },
-                get filteredVendors() {
-                    if (!this.vendorSearchQuery) return this.vendors;
-                    const q = this.vendorSearchQuery.toLowerCase();
-                    return this.vendors.filter(v => v.name.toLowerCase().includes(q));
-                },
-                get expiringVendors() {
-                    const today = new Date();
-                    return this.vendors.filter(v => {
-                        if (!v.contractEndDate) return false;
-                        const end = new Date(v.contractEndDate);
-                        const diffDays = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
-                        return diffDays <= 90 && diffDays >= 0;
-                    }).map(v => {
-                        const end = new Date(v.contractEndDate);
-                        const daysLeft = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
-                        return { ...v, daysLeft };
-                    });
-                },
-                get vendorPaidTotal() {
-                    return this.vendors.reduce((acc, v) => {
-                        if (v.isInstallment) {
-                            return acc + v.installments.filter(i => i.status === 'PAID').reduce((sum, i) => sum + i.amount, 0);
-                        }
-                        return acc + v.contractAmount;
-                    }, 0);
-                },
-                get vendorPendingTotal() {
-                    return this.vendors.reduce((acc, v) => {
-                        if (v.isInstallment) {
-                            return acc + v.installments.filter(i => i.status !== 'PAID').reduce((sum, i) => sum + i.amount, 0);
-                        }
-                        return acc;
-                    }, 0);
-                },
+          if (!this.syncUrl) return;
+          this.syncStatus = 'syncing';
 
-                getCategoryBudget(catId) {
-                    const cat = this.categories.find(c => c.id === catId);
-                    return cat ? (this.annualBudget * (cat.percentage / 100)) : 0;
-                },
-                getCategorySpent(catId) {
-                    return this.expenses.filter(e => e.categoryId === catId).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-                },
-                getCategoryStatusClass(catId) {
-                    const budget = this.getCategoryBudget(catId);
-                    const spent = this.getCategorySpent(catId);
-                    if (spent > budget) return 'bg-rose-100 text-rose-700';
-                    if (spent >= budget * 0.85) return 'bg-amber-100 text-amber-700';
-                    return 'bg-emerald-100 text-emerald-700';
-                },
-                getCategoryStatusText(catId) {
-                    const budget = this.getCategoryBudget(catId);
-                    const spent = this.getCategorySpent(catId);
-                    if (spent > budget) return this.t('已超支', 'Over Budget');
-                    if (spent >= budget * 0.85) return this.t('接近上限', 'Near Limit');
-                    return this.t('正常執行', 'On Track');
-                },
-                getCategoryColor(catId) {
-                    const cat = this.categories.find(c => c.id === catId);
-                    return cat ? cat.color : '#64748b';
-                },
-                getCategoryName(catId) {
-                    const cat = this.categories.find(c => c.id === catId);
-                    return cat ? this.t(cat.nameZh, cat.nameEn) : catId;
-                },
-                getVendorName(vendorId) {
-                    const v = this.vendors.find(item => item.id === vendorId);
-                    return v ? v.name : vendorId;
-                },
+          // 使用 fetch text/plain 搭配 no-cors 模式發送
+          fetch(this.syncUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+          }).then(() => {
+            setTimeout(() => { this.syncStatus = 'synced'; }, 600);
+          }).catch(() => {
+            this.syncStatus = 'offline';
+          });
+        },
 
-                getContractBadgeClass(endDate) {
-                    if (!endDate) return 'bg-slate-100 text-slate-600';
-                    const diffDays = Math.ceil((new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24));
-                    if (diffDays < 0) return 'bg-rose-100 text-rose-700';
-                    if (diffDays <= 90) return 'bg-amber-100 text-amber-700';
-                    return 'bg-emerald-100 text-emerald-700';
-                },
-                getContractBadgeText(endDate) {
-                    if (!endDate) return 'N/A';
-                    const diffDays = Math.ceil((new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24));
-                    if (diffDays < 0) return this.t('已到期', 'Expired');
-                    if (diffDays <= 90) return this.t(`剩 ${diffDays} 天到期`, `${diffDays}d left`);
-                    return this.t('履約中', 'Active');
-                },
+        forceSyncFromCloud() {
+          this.fetchCloudData(false);
+        },
 
-                switchTab(tab) {
-                    this.currentTab = tab;
-                    this.$nextTick(() => {
-                        if (window.lucide) lucide.createIcons();
-                        if (tab === 'dashboard') this.updateChartData();
-                    });
-                },
+        // 預算計算與輔助函式
+        formatVND(val) {
+          return (val || 0).toLocaleString('en-US') + ' ₫';
+        },
+        formatNTD(val) {
+          const ntd = Math.round((val || 0) / this.rate);
+          return 'NT$ ' + ntd.toLocaleString('en-US');
+        },
+        totalSpent() {
+          return this.expenses.reduce((acc, cur) => acc + (Number(cur.amount) || 0), 0);
+        },
+        remainingBudget() {
+          return this.totalBudget - this.totalSpent();
+        },
+        overallExecutionRate() {
+          if (!this.totalBudget) return 0;
+          return Math.round((this.totalSpent() / this.totalBudget) * 100);
+        },
+        getCatAllocatedAmount(cat) {
+          return Math.round((this.totalBudget * (cat.percent || 0)) / 100);
+        },
+        getCatSpent(catId) {
+          return this.expenses
+            .filter(e => e.category === catId)
+            .reduce((acc, cur) => acc + (Number(cur.amount) || 0), 0);
+        },
+        getCatProgress(cat) {
+          const alloc = this.getCatAllocatedAmount(cat);
+          if (!alloc) return 0;
+          return Math.round((this.getCatSpent(cat.id) / alloc) * 100);
+        },
+        getCatName(catId) {
+          const c = this.categories.find(x => x.id === catId);
+          return c ? (this.lang === 'zh' ? c.name_zh : c.name_en) : catId;
+        },
 
-                resetEqualShare() {
-                    const share = Math.floor(100 / this.categories.length);
-                    this.categories.forEach(c => c.percentage = share);
-                    this.updateChartData();
-                    this.saveState();
-                },
-                recalculateAllocations() {
-                    this.updateChartData();
-                    this.saveState();
-                },
+        onSliderChange(changedIndex) {
+          this.updateChart();
+          this.pushDataToCloud();
+        },
 
-                saveExpense() {
-                    if (!this.newExpense.title || !this.newExpense.amount) return;
-                    this.expenses.push({
-                        id: 'EXP-' + Date.now(),
-                        ...this.newExpense
-                    });
-                    this.openExpenseModal = false;
-                    this.newExpense = { title: '', categoryId: 'ADS', vendorId: '', amount: 0, date: new Date().toISOString().split('T')[0], paymentStatus: 'PENDING' };
-                    this.saveState();
-                    this.updateChartData();
-                },
-                deleteExpense(id) {
-                    this.expenses = this.expenses.filter(e => e.id !== id);
-                    this.saveState();
-                    this.updateChartData();
-                },
+        rebalanceEqually() {
+          this.categories.forEach(c => c.percent = 20);
+          this.updateChart();
+          this.pushDataToCloud();
+        },
 
-                saveVendor() {
-                    if (!this.newVendor.name) return;
-                    const contractAmt = Number(this.newVendor.contractAmount) || 0;
-                    this.vendors.push({
-                        id: 'V-' + Date.now(),
-                        ...this.newVendor,
-                        isInstallment: true,
-                        installments: [
-                            { stage: 1, amount: Math.round(contractAmt * 0.3), dueDate: '', status: 'PENDING' },
-                            { stage: 2, amount: Math.round(contractAmt * 0.4), dueDate: '', status: 'PENDING' },
-                            { stage: 3, amount: Math.round(contractAmt * 0.3), dueDate: '', status: 'PENDING' }
-                        ]
-                    });
-                    this.openVendorModal = false;
-                    this.newVendor = { name: '', categoryId: 'ADS', contactName: '', email: '', paymentTerms: '3-Stage', contractAmount: 0, contractStartDate: '', contractEndDate: '' };
-                    this.saveState();
-                },
-                deleteVendor(id) {
-                    this.vendors = this.vendors.filter(v => v.id !== id);
-                    this.saveState();
-                },
+        toggleLanguage() {
+          this.lang = this.lang === 'zh' ? 'en' : 'zh';
+          this.updateChart();
+        },
 
-                jumpToVendor(vendorId) {
-                    const v = this.vendors.find(item => item.id === vendorId);
-                    if (v) {
-                        this.vendorSearchQuery = v.name;
-                        this.currentTab = 'vendors';
-                    }
-                },
+        // 合約到期檢測 (90 天內)
+        getExpiringVendors() {
+          const now = new Date();
+          return this.vendors.map(v => {
+            const end = new Date(v.endDate);
+            const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+            return { ...v, daysLeft: diffDays };
+          }).filter(v => v.daysLeft <= 90);
+        },
 
-                openInstallmentConfig(vendor) {
-                    this.activeVendorForInstallment = vendor;
-                    this.openInstallmentModal = true;
-                },
-                toggleInstallmentMode(vendor) {
-                    vendor.isInstallment = !vendor.isInstallment;
-                    if (vendor.isInstallment && (!vendor.installments || vendor.installments.length === 0)) {
-                        const amt = vendor.contractAmount || 0;
-                        vendor.installments = [
-                            { stage: 1, amount: Math.round(amt * 0.3), dueDate: '', status: 'PENDING' },
-                            { stage: 2, amount: Math.round(amt * 0.4), dueDate: '', status: 'PENDING' },
-                            { stage: 3, amount: Math.round(amt * 0.3), dueDate: '', status: 'PENDING' }
-                        ];
-                    }
-                    this.saveState();
-                },
+        getContractBadge(v) {
+          const now = new Date();
+          const end = new Date(v.endDate);
+          const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+          if (diffDays < 0) return { class: 'bg-rose-100 text-rose-700', text: this.lang === 'zh' ? '已到期' : 'Expired' };
+          if (diffDays <= 90) return { class: 'bg-amber-100 text-amber-700', text: this.lang === 'zh' ? `即將到期 (${diffDays}天)` : `Expiring (${diffDays}d)` };
+          return { class: 'bg-emerald-100 text-emerald-700', text: this.lang === 'zh' ? '執行中' : 'Active' };
+        },
 
-                initCharts() {
-                    const pieCtx = document.getElementById('allocationPieChart');
-                    const barCtx = document.getElementById('comparisonBarChart');
+        // 互動操作
+        toggleInstallmentStatus(vendor, idx) {
+          vendor.installments[idx].paid = !vendor.installments[idx].paid;
+          this.pushDataToCloud();
+        },
+        toggleSingleStatus(vendor) {
+          vendor.singlePaid = !vendor.singlePaid;
+          this.pushDataToCloud();
+        },
+        jumpToVendor(vName) {
+          this.currentTab = 'vendors';
+        },
+        deleteExpense(id) {
+          this.expenses = this.expenses.filter(e => e.id !== id);
+          this.updateChart();
+          this.pushDataToCloud();
+        },
+        deleteVendor(id) {
+          this.vendors = this.vendors.filter(v => v.id !== id);
+          this.pushDataToCloud();
+        },
 
-                    if (pieCtx && barCtx) {
-                        this.allocationChart = new Chart(pieCtx, {
-                            type: 'doughnut',
-                            data: {
-                                labels: this.categories.map(c => this.t(c.nameZh, c.nameEn)),
-                                datasets: [{
-                                    data: this.categories.map(c => this.getCategoryBudget(c.id)),
-                                    backgroundColor: this.categories.map(c => c.color)
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false }
-                        });
-
-                        this.comparisonChart = new Chart(barCtx, {
-                            type: 'bar',
-                            data: {
-                                labels: this.categories.map(c => this.t(c.nameZh, c.nameEn)),
-                                datasets: [
-                                    { label: this.t('編列預算', 'Budget'), data: this.categories.map(c => this.getCategoryBudget(c.id)), backgroundColor: '#6366f1' },
-                                    { label: this.t('實際支出', 'Spent'), data: this.categories.map(c => this.getCategorySpent(c.id)), backgroundColor: '#f43f5e' }
-                                ]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false }
-                        });
-                    }
-                },
-
-                updateChartData() {
-                    if (this.allocationChart && this.comparisonChart) {
-                        this.allocationChart.data.labels = this.categories.map(c => this.t(c.nameZh, c.nameEn));
-                        this.allocationChart.data.datasets[0].data = this.categories.map(c => this.getCategoryBudget(c.id));
-                        this.allocationChart.update();
-
-                        this.comparisonChart.data.labels = this.categories.map(c => this.t(c.nameZh, c.nameEn));
-                        this.comparisonChart.data.datasets[0].data = this.categories.map(c => this.getCategoryBudget(c.id));
-                        this.comparisonChart.data.datasets[1].data = this.categories.map(c => this.getCategorySpent(c.id));
-                        this.comparisonChart.update();
-                    }
-                }
-            };
+        // Chart.js
+        initChart() {
+          const ctx = document.getElementById('budgetPieChart');
+          if (!ctx) return;
+          this.chartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: this.categories.map(c => this.lang === 'zh' ? c.name_zh : c.name_en),
+              datasets: [{
+                data: this.categories.map(c => c.percent),
+                backgroundColor: ['#6366F1', '#EC4899', '#3B82F6', '#10B981', '#F59E0B']
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+            }
+          });
+        },
+        updateChart() {
+          if (!this.chartInstance) return;
+          this.chartInstance.data.labels = this.categories.map(c => this.lang === 'zh' ? c.name_zh : c.name_en);
+          this.chartInstance.data.datasets[0].data = this.categories.map(c => c.percent);
+          this.chartInstance.update();
         }
-    </script>
+      }
+    }
+  </script>
 </body>
 </html>
