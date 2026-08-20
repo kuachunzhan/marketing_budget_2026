@@ -3,35 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Marketing Budget & Vendor Hub 2026</title>
+  <title>2026 行銷預算與廠商管理系統 | Marketing Budget & Vendor Hub</title>
+  
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Alpine.js -->
+  <!-- Alpine.js defer -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>[x-cloak] { display: none !important; }</style>
+  
+  <style>
+    [x-cloak] { display: none !important; }
+    /* 客製化捲軸 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen" x-data="budgetApp()" x-init="initApp()" x-cloak>
 
   <!-- 頂部導航列 -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
-        <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-sm">
+        <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-sm">
           <i class="fa-solid fa-chart-pie text-lg"></i>
         </div>
         <div>
           <h1 class="font-bold text-lg text-slate-900 leading-tight" x-text="lang === 'zh' ? '2026 行銷預算與廠商管理系統' : '2026 Marketing Budget & Vendor Hub'"></h1>
-          <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '預算分配 • 渠道監控 • 支出追蹤 • 廠商三期排程' : 'Budget Allocation • Channels • Spend Tracker • Vendor Installments'"></p>
+          <p class="text-xs text-slate-500 hidden sm:block" x-text="lang === 'zh' ? '預算分配 • 渠道監控 • 支出追蹤 • 廠商三期排程' : 'Budget Allocation • Channels • Spend Tracker • Vendor Installments'"></p>
         </div>
       </div>
 
-      <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- 一鍵重置預設預算按鈕 -->
+        <button @click="resetToDefaultPreset()" class="px-2.5 py-1.5 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg border border-rose-200 transition shadow-xs flex items-center space-x-1" title="若畫面資料異常，請點此還原">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span class="hidden sm:inline" x-text="lang === 'zh' ? '重置預設預算' : 'Reset Preset'"></span>
+        </button>
+
         <!-- 雲端同步狀態標籤 -->
-        <button @click="showSyncModal = true" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shadow-sm"
+        <button @click="showSyncModal = true" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border transition shadow-xs"
           :class="{
             'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100': syncStatus === 'synced',
             'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100': syncStatus === 'syncing',
@@ -49,24 +64,24 @@
         </button>
 
         <!-- 語言切換按鈕 -->
-        <button @click="toggleLanguage()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition shadow-sm">
+        <button @click="toggleLanguage()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition shadow-xs">
           <i class="fa-solid fa-globe mr-1"></i> <span x-text="lang === 'zh' ? 'EN' : '繁中'"></span>
         </button>
       </div>
     </div>
 
-    <!-- 分頁選單 (4 大分頁) -->
+    <!-- 4 大核心分頁選單 -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 sm:space-x-8 border-t border-slate-100 text-sm overflow-x-auto">
-      <button @click="currentTab = 'overview'" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'overview' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
+      <button @click="switchTab('overview')" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'overview' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
         <i class="fa-solid fa-chart-line mr-1.5"></i><span x-text="lang === 'zh' ? '預算總覽與分配' : 'Budget Overview & Sliders'"></span>
       </button>
-      <button @click="currentTab = 'channels'" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'channels' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
+      <button @click="switchTab('channels')" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'channels' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
         <i class="fa-solid fa-layer-group mr-1.5"></i><span x-text="lang === 'zh' ? '各渠道執行與剩餘預算' : 'Channel Performance & Remaining'"></span>
       </button>
-      <button @click="currentTab = 'expenses'" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'expenses' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
+      <button @click="switchTab('expenses')" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'expenses' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
         <i class="fa-solid fa-receipt mr-1.5"></i><span x-text="lang === 'zh' ? '支出明細記錄' : 'Expenses Log'"></span>
       </button>
-      <button @click="currentTab = 'vendors'" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'vendors' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
+      <button @click="switchTab('vendors')" class="py-3 font-medium border-b-2 whitespace-nowrap transition" :class="currentTab === 'vendors' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'">
         <i class="fa-solid fa-building-user mr-1.5"></i><span x-text="lang === 'zh' ? '廠商付款與合約管理' : 'Vendor & Contract Hub'"></span>
       </button>
     </div>
@@ -78,7 +93,7 @@
     <!-- 頂部 4 大核心 KPI 統計卡片 -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- 年度總預算卡片 -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
         <div>
           <div class="text-xs font-semibold text-slate-500" x-text="lang === 'zh' ? '年度總預算 (VND / NT$)' : 'Annual Total Budget (VND / NT$)'"></div>
           <div class="text-2xl font-black text-slate-900 mt-1" x-text="formatVND(totalBudget)"></div>
@@ -86,12 +101,12 @@
         </div>
         <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
           <span class="text-slate-500" x-text="lang === 'zh' ? '預算調整：' : 'Adjust Budget:'"></span>
-          <input type="number" x-model.number="totalBudget" @input="onTotalBudgetManualChange()" class="w-32 px-2 py-1 border border-slate-200 rounded text-right font-mono text-xs focus:ring-1 focus:ring-indigo-500">
+          <input type="number" x-model.number="totalBudget" @input="onTotalBudgetManualChange()" class="w-36 px-2 py-1 border border-slate-200 rounded text-right font-mono text-xs focus:ring-1 focus:ring-indigo-500 font-bold text-slate-800">
         </div>
       </div>
 
       <!-- 目前已分配預算卡片 -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
         <div>
           <div class="text-xs font-semibold text-slate-500" x-text="lang === 'zh' ? '目前已分配預算' : 'Total Allocated Budget'"></div>
           <div class="text-2xl font-black text-indigo-600 mt-1" x-text="formatVND(totalAllocatedAmount())"></div>
@@ -104,7 +119,7 @@
       </div>
 
       <!-- 實際已支出總額卡片 -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
         <div>
           <div class="text-xs font-semibold text-slate-500" x-text="lang === 'zh' ? '實際已支出總額' : 'Actual Total Spent'"></div>
           <div class="text-2xl font-black text-rose-600 mt-1" x-text="formatVND(totalSpent())"></div>
@@ -117,9 +132,9 @@
       </div>
 
       <!-- 剩餘可用預算金額卡片 -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
         <div>
-          <div class="text-xs font-semibold text-slate-500" x-text="lang === 'zh' ? '剩餘可用預算金額' : 'Remaining Budget Available'"></div>
+          <div class="text-xs font-semibold text-slate-500" x-text="lang === 'zh' ? '剩餘可預算金額' : 'Remaining Budget Available'"></div>
           <div class="text-2xl font-black text-emerald-600 mt-1" x-text="formatVND(remainingBudget())"></div>
           <div class="text-xs text-emerald-600/80 font-semibold mt-0.5" x-text="`≈ ${formatNTD(remainingBudget())}`"></div>
         </div>
@@ -135,7 +150,7 @@
       <!-- 雙圖表區塊：各管道預算分配比例 (Pie Chart) & 編列預算 vs 實際支出 (Bar Chart) -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- 圓餅圖 -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center">
           <h3 class="font-bold text-slate-900 text-sm mb-4 self-start" x-text="lang === 'zh' ? '各管道預算分配比例 (Pie Chart)' : 'Budget Allocation Share (Pie Chart)'"></h3>
           <div class="w-full max-w-[320px] aspect-square flex items-center justify-center">
             <canvas id="budgetPieChart"></canvas>
@@ -143,7 +158,7 @@
         </div>
 
         <!-- 藍紅柱狀對比圖 -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center">
           <h3 class="font-bold text-slate-900 text-sm mb-4 self-start" x-text="lang === 'zh' ? '編列預算 vs 實際支出 (Bar Chart)' : 'Allocated Budget vs Actual Spent (Bar Chart)'"></h3>
           <div class="w-full h-[300px]">
             <canvas id="budgetBarChart"></canvas>
@@ -151,12 +166,12 @@
         </div>
       </div>
 
-      <!-- 下方：管道預算動態調配清單 (可直接編輯預算數字 + 滑桿) -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <!-- 下方：管道預算動態調配清單 -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-slate-100">
           <div>
-            <h2 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '行銷管道預算動態調配' : 'Dynamic Marketing Budget Allocation'"></h2>
-            <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '可直接手動修改編列預算數字，或拖曳滑桿調整分配比重' : 'Directly type allocated budget amounts or drag sliders to balance share'"></p>
+            <h2 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '動態預算金額與比例調配' : 'Dynamic Budget Allocation & Share'"></h2>
+            <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '可直接手動修改編列預算數字，或拖曳滑桿即時動態計算與顯示比例' : 'Directly type allocated budget amounts or drag sliders to balance share'"></p>
           </div>
           <div class="flex items-center space-x-2">
             <button @click="openAddChannelModal()" class="px-3 py-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-semibold transition border border-indigo-200 shadow-xs">
@@ -174,8 +189,8 @@
               <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                 <div class="flex items-center space-x-2">
                   <span class="w-3 h-3 rounded-full flex-shrink-0" :style="`background-color: ${cat.color}`"></span>
-                  <span class="font-bold text-slate-900 text-sm" x-text="lang === 'zh' ? cat.name_zh : cat.name_en"></span>
-                  <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700" x-text="`${cat.percent}%`"></span>
+                  <span class="font-bold text-slate-900 text-sm" x-text="getCategoryLabel(cat)"></span>
+                  <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700" x-text="`${cat.percent}%`"></span>
                 </div>
 
                 <!-- 可直接編輯的編列預算金額輸入框 -->
@@ -184,7 +199,7 @@
                   <input type="number" x-model.number="cat.amount" @input="onCatAmountChange(idx)" class="w-36 px-2.5 py-1 border border-slate-300 rounded-lg font-bold text-slate-900 text-right text-xs focus:ring-1 focus:ring-indigo-500">
                   <span class="text-xs font-semibold text-slate-600">₫</span>
                   <span class="text-[11px] text-slate-400 font-medium" x-text="`(${formatNTD(cat.amount)})`"></span>
-                  <button @click="deleteCategory(idx)" class="text-slate-300 hover:text-rose-500 p-1 text-xs" title="刪除此管道"><i class="fa-regular fa-trash-can"></i></button>
+                  <button @click="confirmDeleteCategory(idx)" class="text-slate-300 hover:text-rose-500 p-1 text-xs" title="刪除此管道"><i class="fa-regular fa-trash-can"></i></button>
                 </div>
               </div>
 
@@ -218,12 +233,12 @@
       <!-- 渠道卡片清單 (Grid Cards) -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <template x-for="cat in categories" :key="cat.id">
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
             <div>
               <div class="flex justify-between items-start">
                 <div class="flex items-center space-x-2">
                   <span class="w-3.5 h-3.5 rounded-full" :style="`background-color: ${cat.color}`"></span>
-                  <h3 class="font-bold text-slate-900 text-sm" x-text="lang === 'zh' ? cat.name_zh : cat.name_en"></h3>
+                  <h3 class="font-bold text-slate-900 text-sm" x-text="getCategoryLabel(cat)"></h3>
                 </div>
                 <span class="px-2 py-0.5 rounded text-[11px] font-bold"
                   :class="getCatSpent(cat.id) > cat.amount ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'"
@@ -273,13 +288,13 @@
     </div>
 
     <!-- TAB 3: 支出明細記錄 -->
-    <div x-show="currentTab === 'expenses'" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+    <div x-show="currentTab === 'expenses'" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-slate-100">
         <div>
           <h2 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '行銷支出清單' : 'Expense Transactions'"></h2>
           <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '點擊合作廠商名稱可自動連動跳轉至廠商付款管理頁面' : 'Click vendor name to jump directly to vendor payment tracking'"></p>
         </div>
-        <button @click="openNewExpenseModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+        <button @click="openNewExpenseModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition">
           <i class="fa-solid fa-plus mr-1"></i> <span x-text="lang === 'zh' ? '新增支出' : 'Add Expense'"></span>
         </button>
       </div>
@@ -311,8 +326,13 @@
                 <td class="px-4 py-3 text-slate-500" x-text="exp.date"></td>
                 <td class="px-4 py-3 text-right">
                   <button @click="editExpense(exp)" class="text-indigo-600 hover:text-indigo-800 p-1 mr-1"><i class="fa-regular fa-pen-to-square"></i></button>
-                  <button @click="deleteExpense(exp.id)" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                  <button @click="confirmDeleteExpense(exp.id)" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-regular fa-trash-can"></i></button>
                 </td>
+              </tr>
+            </template>
+            <template x-if="expenses.length === 0">
+              <tr>
+                <td colspan="6" class="px-4 py-8 text-center text-slate-400" x-text="lang === 'zh' ? '目前尚無支出記錄' : 'No expenses recorded yet.'"></td>
               </tr>
             </template>
           </tbody>
@@ -324,7 +344,7 @@
     <div x-show="currentTab === 'vendors'" class="space-y-6">
       <!-- 合約即將到期提醒橫幅 (90天內) -->
       <template x-if="getExpiringVendors().length > 0">
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start space-x-3 text-amber-800 text-xs shadow-sm">
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start space-x-3 text-amber-800 text-xs shadow-xs">
           <i class="fa-solid fa-triangle-exclamation text-base text-amber-600 mt-0.5"></i>
           <div>
             <div class="font-bold mb-1" x-text="lang === 'zh' ? '合約到期預警提示 (90 天內到期)' : 'Contract Expiry Alerts (< 90 Days)'"></div>
@@ -340,13 +360,13 @@
       </template>
 
       <!-- 廠商列表與付款進度 -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-slate-100">
           <div>
             <h2 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '合作廠商名冊與三期付款進度' : 'Vendor Directory & Installment Tracker'"></h2>
             <p class="text-xs text-slate-500" x-text="lang === 'zh' ? '管理合約期程、公文編號、付款條件與分期款項，點擊各期標籤可快速切換已付/待付' : 'Manage contract dates, approval docs, terms & installments. Click badges to toggle status.'"></p>
           </div>
-          <button @click="openNewVendorModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+          <button @click="openNewVendorModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition">
             <i class="fa-solid fa-plus mr-1"></i> <span x-text="lang === 'zh' ? '新增廠商' : 'Add Vendor'"></span>
           </button>
         </div>
@@ -409,8 +429,13 @@
                   </td>
                   <td class="px-4 py-3 text-right">
                     <button @click="editVendor(v)" class="text-indigo-600 hover:text-indigo-800 p-1 mr-1"><i class="fa-regular fa-pen-to-square"></i></button>
-                    <button @click="deleteVendor(v.id)" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                    <button @click="confirmDeleteVendor(v.id)" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-regular fa-trash-can"></i></button>
                   </td>
+                </tr>
+              </template>
+              <template x-if="vendors.length === 0">
+                <tr>
+                  <td colspan="6" class="px-4 py-8 text-center text-slate-400" x-text="lang === 'zh' ? '目前尚無廠商記錄' : 'No vendors registered yet.'"></td>
                 </tr>
               </template>
             </tbody>
@@ -437,7 +462,7 @@
             <label class="block font-semibold text-slate-700 mb-1" x-text="lang === 'zh' ? '行銷類別' : 'Category'"></label>
             <select x-model="expenseForm.category" class="w-full px-3 py-2 border rounded-lg text-xs">
               <template x-for="c in categories" :key="c.id">
-                <option :value="c.id" x-text="lang === 'zh' ? c.name_zh : c.name_en"></option>
+                <option :value="c.id" x-text="getCategoryLabel(c)"></option>
               </template>
             </select>
           </div>
@@ -569,7 +594,7 @@
       <div class="space-y-3 text-xs">
         <div>
           <label class="block font-semibold text-slate-700 mb-1" x-text="lang === 'zh' ? '管道名稱 (中文)' : 'Channel Name (ZH)'"></label>
-          <input type="text" x-model="channelForm.name_zh" placeholder="e.g. 網紅合作 (Influencer)" class="w-full px-3 py-2 border rounded-lg text-xs">
+          <input type="text" x-model="channelForm.name_zh" placeholder="e.g. 網紅合作" class="w-full px-3 py-2 border rounded-lg text-xs">
         </div>
         <div>
           <label class="block font-semibold text-slate-700 mb-1" x-text="lang === 'zh' ? '管道名稱 (英文)' : 'Channel Name (EN)'"></label>
@@ -620,7 +645,23 @@
     </div>
   </div>
 
-  <!-- JavaScript 核心狀態與連線邏輯 -->
+  <!-- 客製刪除確認 Modal (替代不可用的 confirm()) -->
+  <div x-show="showDeleteConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4 text-center">
+      <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+        <i class="fa-solid fa-trash-can text-lg"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '確認刪除此項目？' : 'Confirm Deletion?'"></h3>
+        <p class="text-xs text-slate-500 mt-1" x-text="lang === 'zh' ? '此動作無法復原，請確認是否繼續。' : 'This action cannot be undone.'"></p>
+      </div>
+      <div class="flex justify-center space-x-2 pt-2">
+        <button @click="showDeleteConfirmModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold" x-text="lang === 'zh' ? '取消' : 'Cancel'"></button>
+        <button @click="executeDelete()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold" x-text="lang === 'zh' ? '確定刪除' : 'Delete'"></button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function budgetApp() {
       return {
@@ -630,14 +671,18 @@
         showExpenseModal: false,
         showVendorModal: false,
         showChannelModal: false,
+        showDeleteConfirmModal: false,
+        deleteConfirmType: null, // 'category' | 'expense' | 'vendor'
+        deleteConfirmId: null,
+        
         syncStatus: 'offline',
         syncUrl: 'https://script.google.com/macros/s/AKfycbwKZbvYp86RUWfEp2oC-_BAhO6z2iElYsH9ui3eoHi1jIHA0fxQ5T-3RCnqkyeYUIRtjg/exec',
         
-        // 截圖中的基礎年度總預算
+        // 基礎年度總預算 (27,618,684,000 ₫)
         totalBudget: 27618684000, 
         rate: 800, // 1 NT$ ≈ 800 VND
 
-        // 截圖中的 9 大行銷渠道與精確金額/比重
+        // 9 大行銷渠道標準預設
         categories: [
           { id: 'performance', name_zh: '成效廣告', name_en: 'Performance Ads', amount: 13085484000, percent: 47.4, color: '#4F46E5' },
           { id: 'social', name_zh: '社群媒體', name_en: 'Social Media', amount: 2349600000, percent: 8.5, color: '#EC4899' },
@@ -667,16 +712,60 @@
         pieChartInstance: null,
         barChartInstance: null,
 
+        // 預設顏色庫
+        defaultColors: ['#4F46E5', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6', '#06B6D4', '#22C55E', '#EF4444', '#6366F1', '#3B82F6'],
+
+        // Data Sanitization - 避免 undefined 亂碼與白畫面
+        getDefaultCategories() {
+          return [
+            { id: 'performance', name_zh: '成效廣告', name_en: 'Performance Ads', amount: 13085484000, percent: 47.4, color: '#4F46E5' },
+            { id: 'social', name_zh: '社群媒體', name_en: 'Social Media', amount: 2349600000, percent: 8.5, color: '#EC4899' },
+            { id: 'pr', name_zh: '公關活動', name_en: 'Public Relations', amount: 1660000000, percent: 6.0, color: '#F59E0B' },
+            { id: 'product', name_zh: '產品行銷', name_en: 'Product Marketing', amount: 601584000, percent: 2.2, color: '#10B981' },
+            { id: 'offline', name_zh: '線下活動', name_en: 'Offline Events', amount: 7420000000, percent: 26.9, color: '#8B5CF6' },
+            { id: 'ooh', name_zh: '戶外廣告 (OOH)', name_en: 'Out of Home (OOH)', amount: 518400000, percent: 1.9, color: '#06B6D4' },
+            { id: 'social_listening', name_zh: '社群追蹤', name_en: 'Social Listening', amount: 383616000, percent: 1.4, color: '#22C55E' },
+            { id: 'itvc', name_zh: 'iTVC', name_en: 'iTVC', amount: 1600000000, percent: 5.8, color: '#EF4444' },
+            { id: 'appsflyer', name_zh: 'Appsflyer', name_en: 'Appsflyer', amount: 3750000000, percent: 13.6, color: '#6366F1' }
+          ];
+        },
+
+        sanitizeCategories(raw) {
+          const defaults = this.getDefaultCategories();
+          if (!Array.isArray(raw) || raw.length === 0) return defaults;
+          
+          return raw.map((c, i) => {
+            const def = defaults[i] || {};
+            const name_zh = c.name_zh || c.name || def.name_zh || (`管道 ${i + 1}`);
+            const name_en = c.name_en || c.name || def.name_en || (`Channel ${i + 1}`);
+            const amt = Number(c.amount) >= 0 ? Number(c.amount) : (def.amount || 0);
+            const pct = Number(c.percent) >= 0 ? Number(c.percent) : (def.percent || 0);
+            
+            return {
+              id: c.id || ('cat_' + i),
+              name_zh: name_zh,
+              name_en: name_en,
+              amount: amt,
+              percent: pct,
+              color: c.color || def.color || this.defaultColors[i % this.defaultColors.length]
+            };
+          });
+        },
+
         initApp() {
           const localState = localStorage.getItem('mkt_budget_state_2026');
           if (localState) {
             try {
               const parsed = JSON.parse(localState);
-              if (parsed.totalBudget) this.totalBudget = parsed.totalBudget;
-              if (parsed.categories && parsed.categories.length > 0) this.categories = parsed.categories;
-              if (parsed.expenses) this.expenses = parsed.expenses;
-              if (parsed.vendors) this.vendors = parsed.vendors;
-            } catch(e) {}
+              if (parsed.totalBudget) this.totalBudget = Number(parsed.totalBudget) || 27618684000;
+              this.categories = this.sanitizeCategories(parsed.categories);
+              if (parsed.expenses && Array.isArray(parsed.expenses)) this.expenses = parsed.expenses;
+              if (parsed.vendors && Array.isArray(parsed.vendors)) this.vendors = parsed.vendors;
+            } catch(e) {
+              this.categories = this.getDefaultCategories();
+            }
+          } else {
+            this.categories = this.getDefaultCategories();
           }
 
           this.$nextTick(() => {
@@ -685,6 +774,23 @@
             setInterval(() => {
               if (this.syncUrl) this.fetchCloudData(true);
             }, 15000);
+          });
+        },
+
+        resetToDefaultPreset() {
+          localStorage.removeItem('mkt_budget_state_2026');
+          this.totalBudget = 27618684000;
+          this.categories = this.getDefaultCategories();
+          this.updateCharts();
+          this.pushDataToCloud();
+        },
+
+        switchTab(tab) {
+          this.currentTab = tab;
+          this.$nextTick(() => {
+            if (tab === 'overview' || tab === 'channels') {
+              this.initCharts();
+            }
           });
         },
 
@@ -718,10 +824,10 @@
             clearTimeout(timer);
             if (res && res.status === 'success' && res.data) {
               const d = res.data;
-              if (d.totalBudget) this.totalBudget = d.totalBudget;
-              if (d.categories && d.categories.length > 0) this.categories = d.categories;
-              if (d.expenses) this.expenses = d.expenses;
-              if (d.vendors) this.vendors = d.vendors;
+              if (d.totalBudget) this.totalBudget = Number(d.totalBudget) || 27618684000;
+              this.categories = this.sanitizeCategories(d.categories);
+              if (d.expenses && Array.isArray(d.expenses)) this.expenses = d.expenses;
+              if (d.vendors && Array.isArray(d.vendors)) this.vendors = d.vendors;
               this.syncStatus = 'synced';
               this.updateCharts();
             } else {
@@ -787,12 +893,15 @@
         getCatProgress(cat) {
           return cat.amount ? Math.round((this.getCatSpent(cat.id) / cat.amount) * 100) : 0;
         },
+        getCategoryLabel(c) {
+          if (!c) return '';
+          return this.lang === 'zh' ? (c.name_zh || c.name || c.id) : (c.name_en || c.name_zh || c.name || c.id);
+        },
         getCatName(id) {
           const c = this.categories.find(x => x.id === id);
-          return c ? (this.lang === 'zh' ? c.name_zh : c.name_en) : id;
+          return c ? this.getCategoryLabel(c) : id;
         },
 
-        // 預算與滑桿雙向聯動
         onTotalBudgetManualChange() {
           if (this.totalBudget > 0) {
             this.categories.forEach(c => {
@@ -850,12 +959,10 @@
           this.updateCharts();
           this.pushDataToCloud();
         },
-        deleteCategory(idx) {
-          if (confirm(this.lang === 'zh' ? '確定要刪除此管道嗎？' : 'Delete this channel?')) {
-            this.categories.splice(idx, 1);
-            this.updateCharts();
-            this.pushDataToCloud();
-          }
+        confirmDeleteCategory(idx) {
+          this.deleteConfirmType = 'category';
+          this.deleteConfirmId = idx;
+          this.showDeleteConfirmModal = true;
         },
 
         // 支出管理
@@ -883,10 +990,10 @@
           this.updateCharts();
           this.pushDataToCloud();
         },
-        deleteExpense(id) {
-          this.expenses = this.expenses.filter(e => e.id !== id);
-          this.updateCharts();
-          this.pushDataToCloud();
+        confirmDeleteExpense(id) {
+          this.deleteConfirmType = 'expense';
+          this.deleteConfirmId = id;
+          this.showDeleteConfirmModal = true;
         },
         jumpToVendor(name) {
           if (!name) return;
@@ -938,10 +1045,29 @@
           this.showVendorModal = false;
           this.pushDataToCloud();
         },
-        deleteVendor(id) {
-          this.vendors = this.vendors.filter(v => v.id !== id);
-          this.pushDataToCloud();
+        confirmDeleteVendor(id) {
+          this.deleteConfirmType = 'vendor';
+          this.deleteConfirmId = id;
+          this.showDeleteConfirmModal = true;
         },
+
+        // 執行無 confirm() 的刪除功能
+        executeDelete() {
+          if (this.deleteConfirmType === 'category') {
+            this.categories.splice(this.deleteConfirmId, 1);
+            this.updateCharts();
+            this.pushDataToCloud();
+          } else if (this.deleteConfirmType === 'expense') {
+            this.expenses = this.expenses.filter(e => e.id !== this.deleteConfirmId);
+            this.updateCharts();
+            this.pushDataToCloud();
+          } else if (this.deleteConfirmType === 'vendor') {
+            this.vendors = this.vendors.filter(v => v.id !== this.deleteConfirmId);
+            this.pushDataToCloud();
+          }
+          this.showDeleteConfirmModal = false;
+        },
+
         toggleInstallmentStatus(v, idx) {
           v.installments[idx].paid = !v.installments[idx].paid;
           this.pushDataToCloud();
@@ -974,82 +1100,90 @@
           this.updateCharts();
         },
 
-        // Chart.js 初始化與更新 (Pie Chart + Bar Chart)
+        // Chart.js 初始化與更新
         initCharts() {
           // 1. 圓餅圖 (Pie Chart)
           const pieCtx = document.getElementById('budgetPieChart');
           if (pieCtx) {
-            const existingPie = Chart.getChart(pieCtx);
-            if (existingPie) existingPie.destroy();
-            this.pieChartInstance = new Chart(pieCtx, {
-              type: 'doughnut',
-              data: {
-                labels: this.categories.map(c => this.lang === 'zh' ? c.name_zh : c.name_en),
-                datasets: [{
-                  data: this.categories.map(c => c.amount),
-                  backgroundColor: this.categories.map(c => c.color)
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
-              }
-            });
+            try {
+              const existingPie = Chart.getChart(pieCtx);
+              if (existingPie) existingPie.destroy();
+              this.pieChartInstance = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                  labels: this.categories.map(c => this.getCategoryLabel(c)),
+                  datasets: [{
+                    data: this.categories.map(c => Number(c.amount) || 0),
+                    backgroundColor: this.categories.map(c => c.color || '#4F46E5')
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+                }
+              });
+            } catch(err) {}
           }
 
           // 2. 藍紅柱狀圖 (Bar Chart)
           const barCtx = document.getElementById('budgetBarChart');
           if (barCtx) {
-            const existingBar = Chart.getChart(barCtx);
-            if (existingBar) existingBar.destroy();
-            this.barChartInstance = new Chart(barCtx, {
-              type: 'bar',
-              data: {
-                labels: this.categories.map(c => this.lang === 'zh' ? c.name_zh : c.name_en),
-                datasets: [
-                  {
-                    label: this.lang === 'zh' ? '編列預算' : 'Allocated Budget',
-                    data: this.categories.map(c => c.amount),
-                    backgroundColor: '#4F46E5'
-                  },
-                  {
-                    label: this.lang === 'zh' ? '實際支出' : 'Actual Spent',
-                    data: this.categories.map(c => this.getCatSpent(c.id)),
-                    backgroundColor: '#EF4444'
-                  }
-                ]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    ticks: { callback: (val) => (val / 1000000000).toFixed(1) + 'B' }
-                  }
+            try {
+              const existingBar = Chart.getChart(barCtx);
+              if (existingBar) existingBar.destroy();
+              this.barChartInstance = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                  labels: this.categories.map(c => this.getCategoryLabel(c)),
+                  datasets: [
+                    {
+                      label: this.lang === 'zh' ? '編列預算' : 'Allocated Budget',
+                      data: this.categories.map(c => Number(c.amount) || 0),
+                      backgroundColor: '#4F46E5'
+                    },
+                    {
+                      label: this.lang === 'zh' ? '實際支出' : 'Actual Spent',
+                      data: this.categories.map(c => this.getCatSpent(c.id)),
+                      backgroundColor: '#EF4444'
+                    }
+                  ]
                 },
-                plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } }
-              }
-            });
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: { callback: (val) => (val / 1000000000).toFixed(1) + 'B' }
+                    }
+                  },
+                  plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } }
+                }
+              });
+            } catch(err) {}
           }
         },
 
         updateCharts() {
-          const labels = this.categories.map(c => this.lang === 'zh' ? c.name_zh : c.name_en);
-          if (this.pieChartInstance) {
-            this.pieChartInstance.data.labels = labels;
-            this.pieChartInstance.data.datasets[0].data = this.categories.map(c => c.amount);
-            this.pieChartInstance.data.datasets[0].backgroundColor = this.categories.map(c => c.color);
-            this.pieChartInstance.update();
-          }
-          if (this.barChartInstance) {
-            this.barChartInstance.data.labels = labels;
-            this.barChartInstance.data.datasets[0].label = this.lang === 'zh' ? '編列預算' : 'Allocated Budget';
-            this.barChartInstance.data.datasets[0].data = this.categories.map(c => c.amount);
-            this.barChartInstance.data.datasets[1].label = this.lang === 'zh' ? '實際支出' : 'Actual Spent';
-            this.barChartInstance.data.datasets[1].data = this.categories.map(c => this.getCatSpent(c.id));
-            this.barChartInstance.update();
+          const labels = this.categories.map(c => this.getCategoryLabel(c));
+          try {
+            if (this.pieChartInstance) {
+              this.pieChartInstance.data.labels = labels;
+              this.pieChartInstance.data.datasets[0].data = this.categories.map(c => Number(c.amount) || 0);
+              this.pieChartInstance.data.datasets[0].backgroundColor = this.categories.map(c => c.color || '#4F46E5');
+              this.pieChartInstance.update();
+            }
+            if (this.barChartInstance) {
+              this.barChartInstance.data.labels = labels;
+              this.barChartInstance.data.datasets[0].label = this.lang === 'zh' ? '編列預算' : 'Allocated Budget';
+              this.barChartInstance.data.datasets[0].data = this.categories.map(c => Number(c.amount) || 0);
+              this.barChartInstance.data.datasets[1].label = this.lang === 'zh' ? '實際支出' : 'Actual Spent';
+              this.barChartInstance.data.datasets[1].data = this.categories.map(c => this.getCatSpent(c.id));
+              this.barChartInstance.update();
+            }
+          } catch(err) {
+            this.initCharts();
           }
         }
       }
