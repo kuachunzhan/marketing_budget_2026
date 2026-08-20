@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Budget & Vendor Management System</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Alpine.js (Lightweight Reactive UI) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased font-sans min-h-screen pb-12" x-data="budgetApp()" x-init="initApp()" x-cloak>
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2.5 rounded-xl text-white shadow-md shadow-blue-500/20">
+                    <i class="fa-solid font-bold fa-chart-pie text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight" x-text="t('行銷預算與廠商管理系統', 'Marketing Budget & Vendor System')"></h1>
+                        <!-- Cloud Sync Status Pill -->
+                        <span @click="openCloudModal = true" class="cursor-pointer text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 border transition"
+                              :class="syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (syncStatus === 'syncing' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' : 'bg-slate-100 text-slate-600 border-slate-200')">
+                            <span class="w-2 h-2 rounded-full" :class="syncStatus === 'synced' ? 'bg-emerald-500' : (syncStatus === 'syncing' ? 'bg-amber-500' : 'bg-slate-400')"></span>
+                            <span x-text="syncStatus === 'synced' ? t('雲端已同步', 'Live Synced') : (syncStatus === 'syncing' ? t('同步中...', 'Syncing...') : t('單機模式', 'Local Only'))"></span>
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500" x-text="t('行銷預算編列與廠商付款追蹤系統 (VND ₫ / NT$)', 'Marketing Budget & Vendor Payment System (VND ₫ / NT$)')"></p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold overflow-x-auto">
+                <button @click="currentTab = 'dashboard'" 
+                        :class="currentTab === 'dashboard' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                        class="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-line"></i> <span x-text="t('儀表板與調配', 'Dashboard & Allocations')"></span>
+                </button>
+                <button @click="currentTab = 'expenses'" 
+                        :class="currentTab === 'expenses' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                        class="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative whitespace-nowrap">
+                    <i class="fa-solid fa-receipt"></i> <span x-text="t('支出紀錄明細', 'Expense Log')"></span>
+                    <span class="bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full text-[10px]" x-text="expenses.length"></span>
+                </button>
+                <button @click="currentTab = 'vendors'" 
+                        :class="currentTab === 'vendors' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                        class="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative whitespace-nowrap">
+                    <i class="fa-solid fa-building-user"></i> <span x-text="t('廠商付款管理', 'Vendor Payments')"></span>
+                    <span class="bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded-full text-[10px]" x-text="vendors.length"></span>
+                </button>
+            </nav>
+
+            <!-- Quick Action Buttons & Sync Controls -->
+            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <!-- Cloud Settings Button -->
+                <button @click="openCloudModal = true" class="px-3 py-2 text-xs font-bold text-slate-700 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-lg transition border border-slate-200 flex items-center gap-1.5" title="Google Sheet Cloud Sync">
+                    <i class="fa-solid fa-cloud-arrow-up text-blue-600"></i>
+                    <span x-text="t('雲端同步設定', 'Cloud Sync')"></span>
+                </button>
+
+                <!-- Language Switcher Toggle Button -->
+                <button @click="toggleLanguage()" class="px-3 py-2 text-xs font-bold text-slate-700 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-lg transition border border-slate-200 flex items-center gap-1.5" title="Switch Language / 切換語言">
+                    <i class="fa-solid fa-globe text-blue-600"></i>
+                    <span x-text="lang === 'zh' ? 'English' : '繁體中文'"></span>
+                </button>
+
+                <button @click="openExpenseModal = true" class="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg transition shadow-md shadow-blue-500/20 flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus"></i> <span x-text="t('新增支出', 'Add Expense')"></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+
+        <!-- ================= TAB 1: DASHBOARD OVERVIEW ================= -->
+        <div x-show="currentTab === 'dashboard'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            
+            <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Card 1: Annual Total Budget Setter -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden hover:border-blue-300 transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500" x-text="t('年度總預算 (VND)', 'Annual Budget (VND)')"></span>
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i class="fa-solid fa-wallet"></i></div>
+                    </div>
+                    <div class="mt-1">
+                        <div class="flex items-center gap-1 text-slate-400 font-medium text-xs mb-1">₫ (VND)</div>
+                        <input type="number" step="100000000" x-model.number="annualBudget" @input="recalculateAllocations()" class="w-full text-2xl font-black text-slate-900 border-b-2 border-slate-200 focus:border-blue-600 focus:outline-none bg-transparent transition py-0.5">
+                    </div>
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-xs text-slate-400" x-text="t('估算自動配比', 'Est. Auto Allocation')"></span>
+                        <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full" x-text="`≈ NT$ ${formatNumber(vndToTwd(annualBudget))}`"></span>
+                    </div>
+                </div>
+
+                <!-- Card 2: Total Spent -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500" x-text="t('累積已支出', 'Total Spent')"></span>
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><i class="fa-solid fa-receipt"></i></div>
+                    </div>
+                    <div class="text-2xl font-black text-slate-900 mt-2">
+                        <span x-text="formatNumber(totalSpent)"></span> <span class="text-sm font-bold">₫</span>
+                    </div>
+                    <div class="text-xs text-slate-400 font-medium mt-0.5" x-text="`≈ NT$ ${formatNumber(vndToTwd(totalSpent))}`"></div>
+                    <div class="mt-2 flex items-center text-xs font-medium" :class="totalSpent > annualBudget ? 'text-red-500' : 'text-slate-500'">
+                        <i class="fa-solid mr-1" :class="totalSpent > annualBudget ? 'fa-triangle-exclamation' : 'fa-circle-check text-emerald-500'"></i>
+                        <span x-text="totalSpent > annualBudget ? t('警告：已超出年度預算上限！', 'Warning: Exceeded annual budget!') : t('預算運用狀況正常', 'Budget usage within normal limit')"></span>
+                    </div>
+                </div>
+
+                <!-- Card 3: Remaining Budget -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500" x-text="t('剩餘可運用預算', 'Remaining Budget')"></span>
+                        <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><i class="fa-solid fa-piggy-bank"></i></div>
+                    </div>
+                    <div class="text-2xl font-black mt-2" :class="remainingBudget < 0 ? 'text-red-600' : 'text-slate-900'">
+                        <span x-text="formatNumber(remainingBudget)"></span> <span class="text-sm font-bold">₫</span>
+                    </div>
+                    <div class="text-xs text-slate-400 font-medium mt-0.5" x-text="`≈ NT$ ${formatNumber(vndToTwd(remainingBudget))}`"></div>
+                    <p class="text-xs text-slate-400 mt-1.5">
+                        <span class="font-semibold text-slate-700" x-text="annualBudget > 0 ? ((remainingBudget / annualBudget) * 100).toFixed(1) + '%' : '0%'"></span> <span x-text="t('佔總預算', 'of total budget')"></span>
+                    </p>
+                </div>
+
+                <!-- Card 4: Overall Execution Rate -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500" x-text="t('整體執行率', 'Overall Execution Rate')"></span>
+                        <div class="p-2 bg-amber-50 text-amber-600 rounded-lg"><i class="fa-solid fa-chart-line"></i></div>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <span class="text-3xl font-black text-slate-900" x-text="overallExecutionRate.toFixed(1) + '%'"></span>
+                        <span class="text-xs text-slate-400" x-text="t('已執行', 'Utilized')"></span>
+                    </div>
+                    <!-- Global Progress Bar -->
+                    <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
+                        <div class="h-2 rounded-full transition-all duration-500" 
+                             :class="overallExecutionRate > 100 ? 'bg-red-500' : (overallExecutionRate > 85 ? 'bg-amber-500' : 'bg-blue-600')"
+                             :style="`width: ${Math.min(overallExecutionRate, 100)}%`"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900" x-text="t('五大行銷管道配比', '5 Marketing Channel Allocations')"></h2>
+                            <p class="text-xs text-slate-500" x-text="t('預算佔比與權重分佈', 'Budget proportion & weight distribution')"></p>
+                        </div>
+                        <span class="text-xs px-2.5 py-1 rounded-full font-medium"
+                              :class="totalAllocatedPercentage === 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+                            <span x-text="t('已配置:', 'Allocated:')"></span> <strong x-text="totalAllocatedPercentage.toFixed(0) + '%'"></strong>
+                        </span>
+                    </div>
+                    <div class="relative flex-1 flex items-center justify-center min-h-[260px]">
+                        <canvas id="allocationDoughnutChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900" x-text="t('編列預算 vs 實際支出', 'Budgeted vs. Actual Spend')"></h2>
+                            <p class="text-xs text-slate-500" x-text="t('即時監控各分類執行進度與超支狀況', 'Monitor category execution and overspending status')"></p>
+                        </div>
+                        <div class="flex items-center gap-4 text-xs font-medium text-slate-600">
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span> <span x-text="t('編列預算', 'Budgeted')"></span></span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-indigo-600 inline-block"></span> <span x-text="t('實際支出', 'Actual Spend')"></span></span>
+                        </div>
+                    </div>
+                    <div class="relative flex-1 min-h-[260px]">
+                        <canvas id="comparisonBarChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Allocation Sliders Section -->
+            <section class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-blue-600"></i> <span x-text="t('動態預算重新分配', 'Dynamic Budget Reallocation')"></span>
+                        </h2>
+                        <p class="text-xs text-slate-500" x-text="t('拖曳滑桿即時模擬與動態微調各管道比例及金額', 'Drag sliders to dynamically simulate and reallocate channel proportions and amounts')"></p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button @click="autoBalanceAllocations()" class="text-xs px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-lg border border-blue-200 transition">
+                            <i class="fa-solid fa-scale-balanced mr-1"></i> <span x-text="t('平均分配 (各 20%)', 'Auto-Balance (20% each)')"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <template x-for="(cat, index) in categories" :key="cat.id">
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200/80 hover:border-slate-300 transition flex flex-col justify-between space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full" :style="`background-color: ${cat.color}`"></span>
+                                    <span class="font-bold text-slate-800 text-sm" x-text="getCategoryName(cat.id)"></span>
+                                </div>
+                                <i :class="cat.icon" class="text-slate-400 text-sm"></i>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-baseline mb-1">
+                                    <span class="text-xs text-slate-500" x-text="t('分配比例', 'Allocation Share')"></span>
+                                    <span class="text-sm font-extrabold text-blue-600" x-text="cat.percentage + '%'"></span>
+                                </div>
+                                <input type="range" min="0" max="100" step="1" 
+                                       x-model.number="cat.percentage" 
+                                       @input="onPercentageChange(index)"
+                                       class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                            </div>
+
+                            <div class="pt-2 border-t border-slate-200/60">
+                                <div class="flex justify-between items-center mb-0.5">
+                                    <span class="text-[11px] text-slate-400" x-text="t('預算金額 (VND)', 'Budget Amount (VND)')"></span>
+                                    <span class="text-[10px] text-slate-500 font-medium" x-text="`≈ NT$ ${formatCompactNumber(vndToTwd(cat.allocated))}`"></span>
+                                </div>
+                                <input type="number" step="10000000" x-model.number="cat.allocated" @input="onAmountChange(index)" 
+                                       class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= TAB 2: EXPENSES LOG ================= -->
+        <div x-show="currentTab === 'expenses'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-receipt text-blue-600"></i> <span x-text="t('行銷支出費用明細記錄', 'Marketing Expense Log Transactions')"></span>
+                        </h2>
+                        <p class="text-xs text-slate-500" x-text="t('記錄個別行銷專案支出、連動分類與合作廠商 (以 ₫ / VND 計算)', 'Record individual marketing project expenses, linked categories, and vendors (Calculated in ₫ / VND)')"></p>
+                    </div>
+
+                    <div class="flex items-center flex-wrap gap-3">
+                        <select x-model="selectedCategoryFilter" class="bg-slate-50 border border-slate-300 rounded-lg text-xs py-1.5 px-3 font-medium text-slate-700 focus:outline-none focus:border-blue-500">
+                            <option value="ALL" x-text="t('所有分類', 'All Categories')"></option>
+                            <template x-for="cat in categories" :key="cat.id">
+                                <option :value="cat.id" x-text="getCategoryName(cat.id)"></option>
+                            </template>
+                        </select>
+
+                        <button @click="openExpenseModal = true" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-md shadow-blue-500/20">
+                            <i class="fa-solid fa-plus mr-1"></i> <span x-text="t('新增支出', 'Add Expense')"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600">
+                        <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
+                            <tr>
+                                <th class="px-6 py-3.5" x-text="t('日期', 'Date')"></th>
+                                <th class="px-6 py-3.5" x-text="t('分類管道', 'Category')"></th>
+                                <th class="px-6 py-3.5" x-text="t('專案 / 活動名稱', 'Project / Activity Title')"></th>
+                                <th class="px-6 py-3.5" x-text="t('合作廠商', 'Vendor')"></th>
+                                <th class="px-6 py-3.5 text-center" x-text="t('付款狀態', 'Payment Status')"></th>
+                                <th class="px-6 py-3.5 text-right" x-text="t('金額 (VND ₫ / NT$)', 'Amount (VND ₫ / NT$)')"></th>
+                                <th class="px-6 py-3.5 text-center" x-text="t('操作', 'Actions')"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="item in filteredExpenses" :key="item.id">
+                                <tr class="hover:bg-slate-50/80 transition">
+                                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-500" x-text="item.date"></td>
+                                    <td class="px-6 py-3.5 whitespace-nowrap">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium text-[11px]"
+                                              :style="`background-color: ${getCategoryColor(item.categoryId)}15; color: ${getCategoryColor(item.categoryId)}`">
+                                            <i :class="getCategoryIcon(item.categoryId)"></i>
+                                            <span x-text="getCategoryName(item.categoryId)"></span>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-3.5 font-bold text-slate-800" x-text="getExpenseTitle(item)"></td>
+                                    <td class="px-6 py-3.5 text-slate-600">
+                                        <template x-if="item.vendorId">
+                                            <button @click="jumpToVendor(item.vendorId)" 
+                                                    class="font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 group text-left">
+                                                <span x-text="getVendorName(item.vendorId)"></span>
+                                                <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                                            </button>
+                                        </template>
+                                        <template x-if="!item.vendorId">
+                                            <span class="text-slate-400 italic" x-text="t('未指定廠商', 'Unassigned Vendor')"></span>
+                                        </template>
+                                    </td>
+                                    <td class="px-6 py-3.5 text-center whitespace-nowrap">
+                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold" :class="getPaymentBadgeClass(item.paymentStatus)">
+                                            <span x-text="getPaymentStatusText(item.paymentStatus)"></span>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-3.5 text-right whitespace-nowrap">
+                                        <div class="font-black text-slate-900" x-text="formatNumber(item.amount) + ' ₫'"></div>
+                                        <div class="text-[10px] text-slate-400" x-text="`≈ NT$ ${formatNumber(vndToTwd(item.amount))}`"></div>
+                                    </td>
+                                    <td class="px-6 py-3.5 text-center">
+                                        <button @click="deleteExpense(item.id)" class="text-slate-400 hover:text-red-600 p-1 rounded transition">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= TAB 3: VENDORS ================= -->
+        <div x-show="currentTab === 'vendors'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            <!-- Vendor Contract Alerts & List -->
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-building-user text-blue-600"></i> <span x-text="t('廠商合約與付款排程進度', 'Vendor Contracts & Payment Schedule Progress')"></span>
+                        </h2>
+                    </div>
+
+                    <div class="flex items-center flex-wrap gap-3">
+                        <input type="text" x-model="vendorSearchQuery" :placeholder="t('搜尋廠商...', 'Search vendor...')" 
+                               class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs w-48 focus:bg-white focus:outline-none">
+                        
+                        <button @click="openVendorModal = true; editingVendor = null; resetVendorForm();" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-md shadow-blue-500/20">
+                            <i class="fa-solid fa-plus"></i> <span x-text="t('新增廠商', 'Add Vendor')"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600">
+                        <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
+                            <tr>
+                                <th class="px-5 py-3.5" x-text="t('廠商名稱 / 主對應分類', 'Vendor / Category')"></th>
+                                <th class="px-5 py-3.5" x-text="t('合約期間與狀態', 'Contract Term & Status')"></th>
+                                <th class="px-5 py-3.5" x-text="t('付款條件', 'Payment Terms')"></th>
+                                <th class="px-5 py-3.5 text-right" x-text="t('合約總額', 'Contract Total')"></th>
+                                <th class="px-5 py-3.5 text-right" x-text="t('已付金額', 'Paid Amount')"></th>
+                                <th class="px-5 py-3.5 text-center" x-text="t('操作', 'Actions')"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="vendor in filteredVendors" :key="vendor.id">
+                                <tr class="hover:bg-slate-50/80 transition">
+                                    <td class="px-5 py-4">
+                                        <div class="font-bold text-slate-900 text-sm" x-text="getVendorName(vendor.id)"></div>
+                                        <div class="text-[11px] text-slate-400 mt-0.5" x-text="vendor.contactName"></div>
+                                    </td>
+                                    <td class="px-5 py-4 whitespace-nowrap">
+                                        <div class="text-xs font-semibold text-slate-800" x-text="`${vendor.contractStartDate} ~ ${vendor.contractEndDate}`"></div>
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold inline-block mt-1" :class="getContractBadgeClass(vendor)">
+                                            <span x-text="getContractStatusText(vendor)"></span>
+                                        </span>
+                                    </td>
+                                    <td class="px-5 py-4 whitespace-nowrap">
+                                        <span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-[11px] font-medium" x-text="vendor.paymentTerms"></span>
+                                    </td>
+                                    <td class="px-5 py-4 text-right whitespace-nowrap font-bold text-slate-800" x-text="formatNumber(getVendorTotalContract(vendor.id)) + ' ₫'"></td>
+                                    <td class="px-5 py-4 text-right whitespace-nowrap font-bold text-emerald-600" x-text="formatNumber(getVendorPaidAmount(vendor.id)) + ' ₫'"></td>
+                                    <td class="px-5 py-4 text-center whitespace-nowrap space-x-1">
+                                        <button @click="editVendor(vendor)" class="text-slate-400 hover:text-blue-600 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                                        <button @click="deleteVendor(vendor.id)" class="text-slate-400 hover:text-red-600 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- MODAL: Google Sheet Sync Setting -->
+    <div x-show="openCloudModal" 
+         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+        
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4" @click.away="openCloudModal = false">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-cloud text-blue-600"></i> <span x-text="t('Google Sheet 雲端同步設定', 'Google Sheet Cloud Sync Settings')"></span>
+                </h3>
+                <button @click="openCloudModal = false" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <p class="text-slate-600" x-text="t('貼上部署好的 Google Apps Script Web App 網址，即可實現跨裝置與多人即時資料同步。', 'Paste your Google Apps Script Web App URL to enable multi-user real-time sync across devices.')"></p>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1" x-text="t('Google Apps Script Web App URL', 'Google Apps Script Web App URL')"></label>
+                    <input type="url" x-model="googleSheetUrl" placeholder="https://script.google.com/macros/s/.../exec" 
+                           class="w-full border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:outline-none focus:border-blue-600 font-mono text-[11px]">
+                </div>
+
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                    <div class="flex justify-between text-slate-500">
+                        <span x-text="t('目前狀態:', 'Current Status:')"></span>
+                        <span class="font-bold" :class="syncStatus === 'synced' ? 'text-emerald-600' : 'text-slate-600'" x-text="syncStatus"></span>
+                    </div>
+                    <div class="flex justify-between text-slate-500">
+                        <span x-text="t('上次同步時間:', 'Last Synced:')"></span>
+                        <span class="font-mono" x-text="lastSyncedTime || t('未同步', 'Never')"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-3 flex gap-3 text-xs">
+                <button type="button" @click="saveCloudConfig()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md shadow-blue-500/20 transition" x-text="t('測試連線並儲存', 'Test Connection & Save')"></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function budgetApp() {
+            return {
+                lang: 'zh',
+                currentTab: 'dashboard',
+                annualBudget: 8000000000,
+                twdExchangeRate: 800,
+
+                openExpenseModal: false,
+                openVendorModal: false,
+                openInstallmentModal: false,
+                openCloudModal: false,
+
+                googleSheetUrl: '',
+                syncStatus: 'offline', // 'offline', 'syncing', 'synced'
+                lastSyncedTime: '',
+                syncTimer: null,
+
+                selectedCategoryFilter: 'ALL',
+                vendorSearchQuery: '',
+                editingVendor: null,
+
+                doughnutChartInstance: null,
+                barChartInstance: null,
+
+                categories: [
+                    { id: 'social', nameZh: '社群媒體', nameEn: 'Social Media', percentage: 25, allocated: 2000000000, spent: 0, color: '#3b82f6', icon: 'fa-brands fa-instagram' },
+                    { id: 'pr', nameZh: '公關活動', nameEn: 'Public Relations', percentage: 15, allocated: 1200000000, spent: 0, color: '#10b981', icon: 'fa-solid fa-bullhorn' },
+                    { id: 'performance', nameZh: '成效廣告', nameEn: 'Performance Ads', percentage: 35, allocated: 2800000000, spent: 0, color: '#f59e0b', icon: 'fa-solid fa-rectangle-ad' },
+                    { id: 'product', nameZh: '產品行銷', nameEn: 'Product Marketing', percentage: 10, allocated: 800000000, spent: 0, color: '#8b5cf6', icon: 'fa-solid fa-box-open' },
+                    { id: 'offline', nameZh: '線下活動', nameEn: 'Offline Events', percentage: 15, allocated: 1200000000, spent: 0, color: '#f43f5e', icon: 'fa-solid fa-users-rays' }
+                ],
+
+                vendors: [],
+                expenses: [],
+
+                t(zh, en) { return this.lang === 'zh' ? zh : en; },
+                toggleLanguage() { this.lang = this.lang === 'zh' ? 'en' : 'zh'; this.saveState(); },
+
+                async initApp() {
+                    this.googleSheetUrl = localStorage.getItem('mkt_app_sheet_url') || '';
+                    const saved = localStorage.getItem('mkt_app_state');
+                    if (saved) {
+                        try {
+                            const parsed = JSON.parse(saved);
+                            this.annualBudget = parsed.annualBudget || this.annualBudget;
+                            this.vendors = parsed.vendors || [];
+                            this.expenses = parsed.expenses || [];
+                        } catch(e) {}
+                    }
+
+                    if (this.googleSheetUrl) {
+                        await this.fetchFromCloud();
+                        // 啟動每 10 秒自動輪詢雲端資料 (多人共編同步)
+                        this.syncTimer = setInterval(() => this.fetchFromCloud(true), 10000);
+                    }
+
+                    this.updateCategorySpent();
+                    this.$nextTick(() => this.initCharts());
+                },
+
+                async fetchFromCloud(isBackground = false) {
+                    if (!this.googleSheetUrl) return;
+                    if (!isBackground) this.syncStatus = 'syncing';
+
+                    try {
+                        const res = await fetch(this.googleSheetUrl);
+                        const json = await res.json();
+                        if (json.status === 'success' && json.data && json.data.annualBudget) {
+                            this.annualBudget = json.data.annualBudget;
+                            this.vendors = json.data.vendors || [];
+                            this.expenses = json.data.expenses || [];
+                            if (json.data.categories) {
+                                json.data.categories.forEach((c, idx) => {
+                                    if (this.categories[idx]) {
+                                        this.categories[idx].percentage = c.percentage;
+                                        this.categories[idx].allocated = c.allocated;
+                                    }
+                                });
+                            }
+                            this.syncStatus = 'synced';
+                            this.lastSyncedTime = new Date().toLocaleTimeString();
+                            this.updateCategorySpent();
+                            this.updateCharts();
+                        }
+                    } catch (err) {
+                        console.warn('Cloud fetch warning:', err);
+                        if (!isBackground) this.syncStatus = 'offline';
+                    }
+                },
+
+                async pushToCloud() {
+                    if (!this.googleSheetUrl) return;
+                    this.syncStatus = 'syncing';
+                    const payload = {
+                        annualBudget: this.annualBudget,
+                        categories: this.categories.map(c => ({ id: c.id, percentage: c.percentage, allocated: c.allocated })),
+                        vendors: this.vendors,
+                        expenses: this.expenses
+                    };
+
+                    try {
+                        await fetch(this.googleSheetUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify(payload)
+                        });
+                        this.syncStatus = 'synced';
+                        this.lastSyncedTime = new Date().toLocaleTimeString();
+                    } catch(err) {
+                        console.error('Cloud push error:', err);
+                        this.syncStatus = 'offline';
+                    }
+                },
+
+                saveState() {
+                    const data = {
+                        annualBudget: this.annualBudget,
+                        vendors: this.vendors,
+                        expenses: this.expenses
+                    };
+                    localStorage.setItem('mkt_app_state', JSON.stringify(data));
+                    this.pushToCloud();
+                },
+
+                async saveCloudConfig() {
+                    localStorage.setItem('mkt_app_sheet_url', this.googleSheetUrl);
+                    await this.fetchFromCloud();
+                    this.openCloudModal = false;
+                },
+
+                vndToTwd(vnd) { return Math.round((vnd || 0) / this.twdExchangeRate); },
+                formatNumber(val) { return Math.round(val || 0).toLocaleString('en-US'); },
+                formatCompactNumber(val) {
+                    if (!val) return '0';
+                    const absVal = Math.abs(val);
+                    if (absVal >= 1000000000) return (val / 1000000000).toFixed(1) + ' B';
+                    if (absVal >= 1000000) return (val / 1000000).toFixed(1) + ' M';
+                    return this.formatNumber(val);
+                },
+
+                get totalSpent() { return this.expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0); },
+                get remainingBudget() { return this.annualBudget - this.totalSpent; },
+                get overallExecutionRate() { return this.annualBudget > 0 ? (this.totalSpent / this.annualBudget) * 100 : 0; },
+                get totalAllocatedPercentage() { return this.categories.reduce((s, c) => s + (Number(c.percentage) || 0), 0); },
+
+                recalculateAllocations() {
+                    this.categories.forEach(cat => cat.allocated = Math.round((this.annualBudget * cat.percentage) / 100));
+                    this.updateCharts();
+                    this.saveState();
+                },
+                onPercentageChange(idx) {
+                    const cat = this.categories[idx];
+                    cat.allocated = Math.round((this.annualBudget * cat.percentage) / 100);
+                    this.updateCharts();
+                    this.saveState();
+                },
+                onAmountChange(idx) {
+                    const cat = this.categories[idx];
+                    if (this.annualBudget > 0) cat.percentage = Math.round((cat.allocated / this.annualBudget) * 100);
+                    this.updateCharts();
+                    this.saveState();
+                },
+                autoBalanceAllocations() {
+                    this.categories.forEach(cat => { cat.percentage = 20; cat.allocated = Math.round(this.annualBudget * 0.2); });
+                    this.updateCharts();
+                    this.saveState();
+                },
+                updateCategorySpent() {
+                    this.categories.forEach(cat => {
+                        cat.spent = this.expenses.filter(e => e.categoryId === cat.id).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+                    });
+                },
+
+                getCategoryName(id) { const c = this.categories.find(item => item.id === id); return c ? (this.lang === 'zh' ? c.nameZh : c.nameEn) : id; },
+                getCategoryColor(id) { const c = this.categories.find(item => item.id === id); return c ? c.color : '#3b82f6'; },
+                getCategoryIcon(id) { const c = this.categories.find(item => item.id === id); return c ? c.icon : 'fa-solid fa-receipt'; },
+
+                get filteredExpenses() {
+                    if (this.selectedCategoryFilter === 'ALL') return this.expenses;
+                    return this.expenses.filter(e => e.categoryId === this.selectedCategoryFilter);
+                },
+                getExpenseTitle(i) { return i.title || i.titleZh || i.titleEn || ''; },
+
+                deleteExpense(id) {
+                    this.expenses = this.expenses.filter(e => e.id !== id);
+                    this.updateCategorySpent();
+                    this.updateCharts();
+                    this.saveState();
+                },
+
+                jumpToVendor(vId) {
+                    const v = this.vendors.find(item => item.id === vId);
+                    this.currentTab = 'vendors';
+                    this.vendorSearchQuery = v ? this.getVendorName(v.id) : '';
+                },
+
+                getVendorName(vId) {
+                    const v = this.vendors.find(item => item.id === vId);
+                    if (!v) return this.t('未指定廠商', 'Unassigned Vendor');
+                    return v.name || v.nameZh || v.nameEn || '';
+                },
+
+                getContractStatusText(v) {
+                    if (!v.contractEndDate) return this.t('生效中', 'Active');
+                    const days = Math.ceil((new Date(v.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24));
+                    if (days < 0) return this.t('已到期', 'Expired');
+                    if (days <= 90) return this.t(`即將到期 (${days}天)`, `Expiring (${days}d)`);
+                    return this.t('生效中', 'Active');
+                },
+                getContractBadgeClass(v) {
+                    if (!v.contractEndDate) return 'bg-emerald-100 text-emerald-800';
+                    const days = Math.ceil((new Date(v.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24));
+                    if (days < 0) return 'bg-rose-100 text-rose-800';
+                    if (days <= 90) return 'bg-amber-100 text-amber-800 animate-pulse';
+                    return 'bg-emerald-100 text-emerald-800';
+                },
+
+                get filteredVendors() {
+                    const q = this.vendorSearchQuery.toLowerCase();
+                    return this.vendors.filter(v => this.getVendorName(v.id).toLowerCase().includes(q));
+                },
+
+                getVendorTotalContract(vId) {
+                    return this.expenses.filter(e => e.vendorId === vId).reduce((s, e) => s + Number(e.amount), 0);
+                },
+                getVendorPaidAmount(vId) {
+                    return this.expenses.filter(e => e.vendorId === vId && e.paymentStatus === 'Paid').reduce((s, e) => s + Number(e.amount), 0);
+                },
+
+                deleteVendor(id) {
+                    this.vendors = this.vendors.filter(v => v.id !== id);
+                    this.saveState();
+                },
+
+                initCharts() {
+                    const dCanvas = document.getElementById('allocationDoughnutChart');
+                    const bCanvas = document.getElementById('comparisonBarChart');
+                    if (!dCanvas || !bCanvas) return;
+
+                    this.doughnutChartInstance = new Chart(dCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: this.categories.map(c => this.getCategoryName(c.id)),
+                            datasets: [{ data: this.categories.map(c => c.allocated), backgroundColor: this.categories.map(c => c.color) }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+
+                    this.barChartInstance = new Chart(bCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: this.categories.map(c => this.getCategoryName(c.id)),
+                            datasets: [
+                                { label: this.t('編列預算', 'Budgeted'), data: this.categories.map(c => c.allocated), backgroundColor: '#3b82f6' },
+                                { label: this.t('實際支出', 'Actual Spend'), data: this.categories.map(c => c.spent), backgroundColor: '#4f46e5' }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                },
+
+                updateCharts() {
+                    if (this.doughnutChartInstance) {
+                        this.doughnutChartInstance.data.labels = this.categories.map(c => this.getCategoryName(c.id));
+                        this.doughnutChartInstance.data.datasets[0].data = this.categories.map(c => c.allocated);
+                        this.doughnutChartInstance.update();
+                    }
+                    if (this.barChartInstance) {
+                        this.barChartInstance.data.labels = this.categories.map(c => this.getCategoryName(c.id));
+                        this.barChartInstance.data.datasets[0].data = this.categories.map(c => c.allocated);
+                        this.barChartInstance.data.datasets[1].data = this.categories.map(c => c.spent);
+                        this.barChartInstance.update();
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
