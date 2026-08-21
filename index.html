@@ -25,8 +25,54 @@
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen" x-data="budgetApp()" x-init="initApp()" x-cloak>
 
-  <!-- 頂部導航列 -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+  <!-- 權限登入驗證全螢幕遮罩 (Login Overlay) -->
+  <div x-show="!isLoggedIn" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6 border border-slate-100 text-center">
+      <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+        <i class="fa-solid fa-shield-halved text-2xl"></i>
+      </div>
+      <div>
+        <h2 class="font-extrabold text-xl text-slate-900 leading-tight" x-text="lang === 'zh' ? '行銷預算管理系統存取驗證' : 'Marketing Budget Hub Access'"></h2>
+        <p class="text-xs text-slate-500 mt-1.5" x-text="lang === 'zh' ? '請輸入存取通行密碼以解鎖並檢視儀表板數據' : 'Please enter access password to view dashboard'"></p>
+      </div>
+
+      <!-- 密碼輸入表單 -->
+      <form @submit.prevent="attemptLogin()" class="space-y-4 text-left">
+        <div>
+          <label class="block font-semibold text-xs text-slate-700 mb-1.5" x-text="lang === 'zh' ? '系統通行密碼' : 'Access Password'"></label>
+          <div class="relative">
+            <input :type="showLoginPassword ? 'text' : 'password'" x-model="loginInputPassword" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="••••••••">
+            <button type="button" @click="showLoginPassword = !showLoginPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <i class="fa-solid" :class="showLoginPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 登入錯誤提示 -->
+        <template x-if="loginError">
+          <div class="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center space-x-2">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span x-text="loginError"></span>
+          </div>
+        </template>
+
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" x-model="rememberMe" class="rounded text-indigo-600 focus:ring-indigo-500">
+            <span x-text="lang === 'zh' ? '保持登入狀態' : 'Remember me'"></span>
+          </label>
+        </div>
+
+        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-200 transition duration-150 flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-key"></i>
+          <span x-text="lang === 'zh' ? '驗證並解鎖系統' : 'Unlock Dashboard'"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 頂部導航列 (登入後顯示) -->
+  <header x-show="isLoggedIn" class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-sm">
@@ -39,7 +85,13 @@
       </div>
 
       <div class="flex items-center space-x-2 sm:space-x-3">
-        <!-- 一鍵重置預設預算按鈕 -->
+        <!-- 變更密碼按鈕 -->
+        <button @click="showChangePasswordModal = true" class="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition shadow-xs flex items-center space-x-1" title="變更系統通行密碼">
+          <i class="fa-solid fa-lock text-slate-500"></i>
+          <span class="hidden sm:inline" x-text="lang === 'zh' ? '變更密碼' : 'Password'"></span>
+        </button>
+
+        <!-- 重置預設預算按鈕 -->
         <button @click="resetToDefaultPreset()" class="px-2.5 py-1.5 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg border border-rose-200 transition shadow-xs flex items-center space-x-1" title="若畫面資料異常，請點此還原">
           <i class="fa-solid fa-rotate-left"></i>
           <span class="hidden sm:inline" x-text="lang === 'zh' ? '重置預設預算' : 'Reset Preset'"></span>
@@ -67,6 +119,11 @@
         <button @click="toggleLanguage()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition shadow-xs">
           <i class="fa-solid fa-globe mr-1"></i> <span x-text="lang === 'zh' ? 'EN' : '繁中'"></span>
         </button>
+
+        <!-- 登出按鈕 -->
+        <button @click="logout()" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition" title="登出系統">
+          <i class="fa-solid fa-right-from-bracket text-base"></i>
+        </button>
       </div>
     </div>
 
@@ -87,8 +144,8 @@
     </div>
   </header>
 
-  <!-- 主內容區 -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+  <!-- 主內容區 (登入後顯示) -->
+  <main x-show="isLoggedIn" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
     <!-- 頂部 4 大核心 KPI 統計卡片 -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -452,6 +509,26 @@
     </div>
   </main>
 
+  <!-- 彈窗 0：變更系統通行密碼 Modal -->
+  <div x-show="showChangePasswordModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+        <h3 class="font-bold text-slate-900 text-base" x-text="lang === 'zh' ? '變更存取通行密碼' : 'Change Password'"></h3>
+        <button @click="showChangePasswordModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1" x-text="lang === 'zh' ? '輸入新密碼' : 'New Password'"></label>
+          <input type="password" x-model="newMasterPassword" class="w-full px-3 py-2 border rounded-lg text-xs" placeholder="輸入新密碼">
+        </div>
+      </div>
+      <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+        <button @click="showChangePasswordModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold" x-text="lang === 'zh' ? '取消' : 'Cancel'"></button>
+        <button @click="saveNewPassword()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold" x-text="lang === 'zh' ? '儲存新密碼' : 'Save Password'"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- 彈窗 1：新增/編輯支出 (Expense Modal) -->
   <div x-show="showExpenseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
@@ -502,7 +579,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 2：新增/編輯廠商 (Vendor Modal 含 4 大付款條件及三期自訂比例) -->
+  <!-- 彈窗 2：新增/編輯廠商 (Vendor Modal) -->
   <div x-show="showVendorModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl space-y-4 my-8">
       <div class="flex justify-between items-center pb-2 border-b border-slate-100">
@@ -550,7 +627,7 @@
           </div>
         </div>
 
-        <!-- 三期付款細項排程（比例可自行調配） -->
+        <!-- 三期付款細項排程 -->
         <template x-if="vendorForm.paymentType === '3_stage'">
           <div class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div class="flex flex-wrap justify-between items-center gap-2">
@@ -601,7 +678,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 3：新增行銷管道 (Add Channel Modal) -->
+  <!-- 彈窗 3：新增行銷管道 -->
   <div x-show="showChannelModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
       <div class="flex justify-between items-center pb-2 border-b border-slate-100">
@@ -662,7 +739,7 @@
     </div>
   </div>
 
-  <!-- 客製刪除確認 Modal (替代不可用的 confirm()) -->
+  <!-- 客製刪除確認 Modal -->
   <div x-show="showDeleteConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4 text-center">
       <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
@@ -682,6 +759,16 @@
   <script>
     function budgetApp() {
       return {
+        // 登入驗證相關狀態
+        isLoggedIn: false,
+        masterPassword: '2026mkt', // 預設系統密碼
+        loginInputPassword: '',
+        showLoginPassword: false,
+        rememberMe: true,
+        loginError: '',
+        showChangePasswordModal: false,
+        newMasterPassword: '',
+
         lang: 'zh',
         currentTab: 'overview',
         showSyncModal: false,
@@ -689,7 +776,7 @@
         showVendorModal: false,
         showChannelModal: false,
         showDeleteConfirmModal: false,
-        deleteConfirmType: null, // 'category' | 'expense' | 'vendor'
+        deleteConfirmType: null,
         deleteConfirmId: null,
         
         syncStatus: 'offline',
@@ -699,19 +786,7 @@
         totalBudget: 27618684000, 
         rate: 800, // 1 NT$ ≈ 800 VND
 
-        // 9 大行銷渠道標準預設
-        categories: [
-          { id: 'performance', name_zh: '成效廣告', name_en: 'Performance Ads', amount: 13085484000, percent: 47.4, color: '#4F46E5' },
-          { id: 'social', name_zh: '社群媒體', name_en: 'Social Media', amount: 2349600000, percent: 8.5, color: '#EC4899' },
-          { id: 'pr', name_zh: '公關活動', name_en: 'Public Relations', amount: 1660000000, percent: 6.0, color: '#F59E0B' },
-          { id: 'product', name_zh: '產品行銷', name_en: 'Product Marketing', amount: 601584000, percent: 2.2, color: '#10B981' },
-          { id: 'offline', name_zh: '線下活動', name_en: 'Offline Events', amount: 7420000000, percent: 26.9, color: '#8B5CF6' },
-          { id: 'ooh', name_zh: '戶外廣告 (OOH)', name_en: 'Out of Home (OOH)', amount: 518400000, percent: 1.9, color: '#06B6D4' },
-          { id: 'social_listening', name_zh: '社群追蹤', name_en: 'Social Listening', amount: 383616000, percent: 1.4, color: '#22C55E' },
-          { id: 'itvc', name_zh: 'iTVC', name_en: 'iTVC', amount: 1600000000, percent: 5.8, color: '#EF4444' },
-          { id: 'appsflyer', name_zh: 'Appsflyer', name_en: 'Appsflyer', amount: 3750000000, percent: 13.6, color: '#6366F1' }
-        ],
-
+        categories: [],
         expenses: [],
         vendors: [],
 
@@ -728,11 +803,8 @@
 
         pieChartInstance: null,
         barChartInstance: null,
-
-        // 預設顏色庫
         defaultColors: ['#4F46E5', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6', '#06B6D4', '#22C55E', '#EF4444', '#6366F1', '#3B82F6'],
 
-        // Data Sanitization
         getDefaultCategories() {
           return [
             { id: 'performance', name_zh: '成效廣告', name_en: 'Performance Ads', amount: 13085484000, percent: 47.4, color: '#4F46E5' },
@@ -770,6 +842,17 @@
         },
 
         initApp() {
+          // 1. 檢查自訂系統密碼
+          const savedPass = localStorage.getItem('mkt_app_master_pwd_2026');
+          if (savedPass) this.masterPassword = savedPass;
+
+          // 2. 檢查登入 Session 狀態
+          const authSession = sessionStorage.getItem('mkt_auth_logged_in_2026') || localStorage.getItem('mkt_auth_logged_in_2026');
+          if (authSession === 'true') {
+            this.isLoggedIn = true;
+          }
+
+          // 3. 讀取本地 State
           const localState = localStorage.getItem('mkt_budget_state_2026');
           if (localState) {
             try {
@@ -786,12 +869,48 @@
           }
 
           this.$nextTick(() => {
-            this.initCharts();
-            this.fetchCloudData(false);
+            if (this.isLoggedIn) {
+              this.initCharts();
+              this.fetchCloudData(false);
+            }
             setInterval(() => {
-              if (this.syncUrl) this.fetchCloudData(true);
+              if (this.isLoggedIn && this.syncUrl) this.fetchCloudData(true);
             }, 15000);
           });
+        },
+
+        // 登入驗證
+        attemptLogin() {
+          this.loginError = '';
+          if (this.loginInputPassword === this.masterPassword) {
+            this.isLoggedIn = true;
+            if (this.rememberMe) {
+              localStorage.setItem('mkt_auth_logged_in_2026', 'true');
+            } else {
+              sessionStorage.setItem('mkt_auth_logged_in_2026', 'true');
+            }
+            this.loginInputPassword = '';
+            this.$nextTick(() => {
+              this.initCharts();
+              this.fetchCloudData(false);
+            });
+          } else {
+            this.loginError = this.lang === 'zh' ? '通行密碼不正確，請重新輸入' : 'Invalid access password';
+          }
+        },
+
+        logout() {
+          this.isLoggedIn = false;
+          localStorage.removeItem('mkt_auth_logged_in_2026');
+          sessionStorage.removeItem('mkt_auth_logged_in_2026');
+        },
+
+        saveNewPassword() {
+          if (!this.newMasterPassword) return;
+          this.masterPassword = this.newMasterPassword;
+          localStorage.setItem('mkt_app_master_pwd_2026', this.newMasterPassword);
+          this.showChangePasswordModal = false;
+          this.newMasterPassword = '';
         },
 
         resetToDefaultPreset() {
@@ -827,7 +946,7 @@
         },
 
         fetchCloudData(silent = false) {
-          if (!this.syncUrl) return;
+          if (!this.syncUrl || !this.isLoggedIn) return;
           if (!silent) this.syncStatus = 'syncing';
 
           const callbackName = 'gas_cb_' + Math.round(100000 * Math.random());
@@ -885,7 +1004,7 @@
           };
           localStorage.setItem('mkt_budget_state_2026', JSON.stringify(payload));
 
-          if (!this.syncUrl) return;
+          if (!this.syncUrl || !this.isLoggedIn) return;
           this.syncStatus = 'syncing';
 
           fetch(this.syncUrl, {
@@ -1136,6 +1255,7 @@
 
         // Chart.js 初始化與更新
         initCharts() {
+          if (!this.isLoggedIn) return;
           // 1. 圓餅圖 (Pie Chart)
           const pieCtx = document.getElementById('budgetPieChart');
           if (pieCtx) {
@@ -1200,6 +1320,7 @@
         },
 
         updateCharts() {
+          if (!this.isLoggedIn) return;
           const labels = this.categories.map(c => this.getCategoryLabel(c));
           try {
             if (this.pieChartInstance) {
